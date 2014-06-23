@@ -1,0 +1,13 @@
+# Blender MTL File: 'main_ship_1.blend'
+# Material Count: 1
+
+newmtl Ship_main
+Ns 292.156863
+Ka 0.300000 0.300000 0.300000
+Kd 0.640000 0.640000 0.640000
+Ks 0.279965 0.711759 0.396871
+Ni 1.000000
+d 1.000000
+illum 2
+map_Kd ship_main_col.png
+map_Bump ship_main_col.png
