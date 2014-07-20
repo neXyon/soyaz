@@ -8,6 +8,34 @@ import math
 import os.path
 from model import Model
 
+class HUD(soy.widgets.Container) :
+    def __init__(self, static_texture_filename) :
+        self._statictexture = soy.textures.Texture(static_texture_filename)
+        self._static = soy.widgets.Canvas(self._statictexture)
+        self._dynamictexture = soy.textures.Texture()
+        self._dynamic = soy.widgets.Canvas(self._dynamictexture)
+        self._rotation = 45
+        self.append(self._static)
+        self.append(self._dynamic)
+        self.update()
+        
+    def update(self) :
+        svg_source = '<svg width="1600" height="1200"> \
+  <g transform="translate({0} {1}) scale(0.1) rotate({2} 658.66714 544.37585)">\
+    <path\
+       style="fill:#0093ff;fill-opacity:1;stroke:#00faff;stroke-width:0.94458151px;stroke-linecap:butt;stroke-linejoin:round;stroke-opacity:1"\
+       d="m 499.00169,219.92822 0,0.0313 -475.827294,412.1911 475.827294,0 0,-0.0312 475.85516,0 -475.85516,-412.19111 z" />\
+    <path\
+       style="fill:#0093ff;fill-opacity:1;stroke:#00faff;stroke-width:0.94458151px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"\
+       d="m 841.47912,676.56059 -342.47743,2.03142 0,0.0312 -342.44956,-2.03142 0,137.38662 c 0,0 0.20846,18.11018 21.80213,42.31608 21.59366,24.20589 66.52158,18.31405 66.52158,18.31405 l 254.12585,0 0,-0.0312 254.15372,0 c 0,0 44.92792,5.89183 66.52158,-18.31405 21.59367,-24.2059 21.80213,-42.31608 21.80213,-42.31608 l 0,-137.38662 z" />\
+  </g>\
+</svg>'.format(100, 100, self._rotation)
+        self._rotation += 1
+        #print(svg_source)
+        if self._rotation % 15 == 0:
+            self._dynamictexture = soy.textures.Texture(svg_source)
+            self._dynamic.texture = self._dynamictexture
+
 class Planet :
     def __init__(self, name, texture, size, position, scene) :
         self.name = name
@@ -72,8 +100,13 @@ room = soy.scenes.Room(1000)
 player = Player(room)
 client.window.append(soy.widgets.Projector(player.cam))
 
-hudtexture = soy.textures.Texture('hud/hud.svg')
-hud = soy.widgets.Canvas(hudtexture)
+# hudtexture = soy.textures.Texture('hud/hud.svg')
+# hud = soy.widgets.Canvas(hudtexture)
+# cont = soy.widgets.Container()
+# cont.append(hud)
+# client.window.append(cont)
+
+hud = HUD('hud/hud.svg')
 client.window.append(hud)
 
 room['light'] = soy.bodies.Light((-2, 3, 5))
@@ -114,6 +147,7 @@ if __name__ == '__main__' :
         #print('')
 
         time.sleep(.01)
+        hud.update()
 
 
 sdl2.SDL_GameControllerClose(player.controller)
