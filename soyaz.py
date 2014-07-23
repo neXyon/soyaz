@@ -30,15 +30,11 @@ class HUD(soy.widgets.Container) :
         self._target_arrow.keep_aspect = True
         self._target_arrow.scaleX = 0.1
         self._target_arrow.scaleY = 0.1
-        self._target_arrow.y = 0.7
-        self._target_arrow.x = 0.3
         self._target_arrow.rotation = 45 / 180 * math.pi
         self._target_circle = soy.widgets.Canvas(soy.textures.Texture('hud/target_circle.svg'))
         self._target_circle.keep_aspect = True
         self._target_circle.scaleX = 0.1
         self._target_circle.scaleY = 0.1
-        self._target_circle.y = 0.7
-        self._target_circle.x = -0.3
         self.append(self._crosshair)
         self.append(self._target)
         self.append(self._stats)
@@ -63,27 +59,49 @@ class HUD(soy.widgets.Container) :
         #print(svg_source)
         #self._dynamictexture.source = svg_source
         
-    def target(self, direction) :
-        angle = math.atan2(direction[1], direction[0])
-        
-        #self._target_arrow.x = 
-        #self._target_arrow.y = 
-        self._target_arrow.rotation = angle - math.pi / 2
+    def target(self, player) :
+        direction = soy.atoms.Vector(target.position - player.cam.position)
+        rot = player.rot.conjugate()
+        direction = rot.rotate(direction)
         
         aspect = self.size[0] / self.size[1]
-        
-        x = math.cos(angle)
-        y = math.sin(angle)
-        
-        yjump = 1 / math.sqrt(aspect * aspect + 1)
-        
-        # left or right screen edge
-        if math.fabs(y) < yjump :
-            self._target_arrow.x = math.copysign(0.9 * aspect, x)
-            self._target_arrow.y = y * self._target_arrow.x / x
-        else :
-            self._target_arrow.y = math.copysign(.9, y)
-            self._target_arrow.x = x * self._target_arrow.y / y
+        onscreen = False
+                
+        if direction[2] < 0 :
+            res = player.cam.project(soy.atoms.Vector(direction), aspect)
+            if math.fabs(res[0]) < 1 and math.fabs(res[1]) < 1 :
+                self._target_circle.scaleX = 0.1
+                self._target_circle.scaleY = 0.1
+                self._target_arrow.scaleX = 0
+                self._target_arrow.scaleY = 0
+                self._target_circle.x = res[0] * aspect
+                self._target_circle.y = res[1]
+                scale = -11 / direction[2]
+                self._target_circle.scaleX = scale
+                self._target_circle.scaleY = scale
+                onscreen = True
+
+        if onscreen == False :
+            angle = math.atan2(direction[1], direction[0])
+            
+            self._target_arrow.rotation = angle - math.pi / 2
+            
+            x = math.cos(angle)
+            y = math.sin(angle)
+            
+            yjump = 1 / math.sqrt(aspect * aspect + 1)
+            
+            if math.fabs(y) < yjump :
+                # left or right screen edge
+                self._target_arrow.x = math.copysign(0.9 * aspect, x)
+                self._target_arrow.y = y * self._target_arrow.x / x
+            else :
+                self._target_arrow.y = math.copysign(.9, y)
+                self._target_arrow.x = x * self._target_arrow.y / y
+            self._target_circle.scaleX = 0
+            self._target_circle.scaleY = 0
+            self._target_arrow.scaleX = 0.1
+            self._target_arrow.scaleY = 0.1
 
 class Planet :
     def __init__(self, name, texture, size, position, scene) :
@@ -197,12 +215,7 @@ if __name__ == '__main__' :
         
         player.update(dt, room)
         
-        v = soy.atoms.Vector(target.position - player.cam.position)
-        v.normalize()
-        rot = player.rot.conjugate()
-        v = rot.rotate(v)
-        
-        hud.target(v)
+        hud.target(player)
 
         #for i in range(32) :
         #    print(sdl2.SDL_GameControllerGetButton(controller, i), end='')
