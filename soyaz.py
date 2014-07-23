@@ -59,9 +59,31 @@ class HUD(soy.widgets.Container) :
 </svg>'.format(100, 100, 0)
 
         #self._rotation += 1
-        self._target_arrow.rotation += 0.1 / 180 * math.pi
+        #self._target_arrow.rotation += 0.1 / 180 * math.pi
         #print(svg_source)
         #self._dynamictexture.source = svg_source
+        
+    def target(self, direction) :
+        angle = math.atan2(direction[1], direction[0])
+        
+        #self._target_arrow.x = 
+        #self._target_arrow.y = 
+        self._target_arrow.rotation = angle - math.pi / 2
+        
+        aspect = self.size[0] / self.size[1]
+        
+        x = math.cos(angle)
+        y = math.sin(angle)
+        
+        yjump = 1 / math.sqrt(aspect * aspect + 1)
+        
+        # left or right screen edge
+        if math.fabs(y) < yjump :
+            self._target_arrow.x = math.copysign(0.9 * aspect, x)
+            self._target_arrow.y = y * self._target_arrow.x / x
+        else :
+            self._target_arrow.y = math.copysign(.9, y)
+            self._target_arrow.x = x * self._target_arrow.y / y
 
 class Planet :
     def __init__(self, name, texture, size, position, scene) :
@@ -71,6 +93,7 @@ class Planet :
         self.sphere.material = soy.materials.Textured(colormap=self.texture)
         self.sphere.radius = size
         self.sphere.position = position
+        self.position = position
         scene[name] = self.sphere
 
 class Player :
@@ -138,14 +161,20 @@ client.window.append(hud)
 
 room['light'] = soy.bodies.Light((-2, 3, 5))
 
+objects = []
 
 box = Model('models/main_ship.obj')
 box.position = soy.atoms.Position((0, 0, 0))
 room['box'] = box
 
+objects.append(box)
 
 earth = Planet('earth', 'textures/earthmap1k.jpg', 3, soy.atoms.Position((20, 0, 0)), room)
 earth.sphere.addTorque(3000,3000,500)
+
+objects.append(earth)
+
+target = objects[1]
 
 #venus = Planet('venus', 'textures/venusmap.png', 2, soy.atoms.Position((0, 0, -50)), room)
 #mercury = Planet('mercury', 'textures/mercurymap.png', 1, soy.atoms.Position((0, 0, -100)), room)
@@ -167,6 +196,13 @@ if __name__ == '__main__' :
         last = current
         
         player.update(dt, room)
+        
+        v = soy.atoms.Vector(target.position - player.cam.position)
+        v.normalize()
+        rot = player.rot.conjugate()
+        v = rot.rotate(v)
+        
+        hud.target(v)
 
         #for i in range(32) :
         #    print(sdl2.SDL_GameControllerGetButton(controller, i), end='')
