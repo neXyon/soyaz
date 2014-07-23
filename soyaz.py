@@ -9,18 +9,45 @@ import os.path
 from model import Model
 
 class HUD(soy.widgets.Container) :
-    def __init__(self, static_texture_filename) :
-        self._statictexture = soy.textures.Texture(static_texture_filename)
-        self._static = soy.widgets.Canvas(self._statictexture)
-        self._dynamictexture = soy.textures.Texture()
-        self._dynamic = soy.widgets.Canvas(self._dynamictexture)
-        self._rotation = 45
-        self.append(self._static)
-        self.append(self._dynamic)
+    def __init__(self) :
+        self._crosshair = soy.widgets.Canvas(soy.textures.Texture('hud/crosshair.svg'))
+        self._crosshair.keep_aspect = True
+        self._crosshair.scaleX = 0.1
+        self._crosshair.scaleY = 0.1
+        self._target = soy.widgets.Canvas(soy.textures.Texture('hud/hud_target.svg'))
+        self._target.keep_aspect = True
+        self._target.scaleX = 0.2
+        self._target.scaleY = 0.2
+        self._target.align = 1
+        self._target.y = -0.7
+        self._stats = soy.widgets.Canvas(soy.textures.Texture('hud/shieldhull.svg'))
+        self._stats.keep_aspect = True
+        self._stats.scaleX = 0.2
+        self._stats.scaleY = 0.2
+        self._stats.align = -1
+        self._stats.y = -0.7
+        self._target_arrow = soy.widgets.Canvas(soy.textures.Texture('hud/target_arrow.svg'))
+        self._target_arrow.keep_aspect = True
+        self._target_arrow.scaleX = 0.1
+        self._target_arrow.scaleY = 0.1
+        self._target_arrow.y = 0.7
+        self._target_arrow.x = 0.3
+        self._target_arrow.rotation = 45 / 180 * math.pi
+        self._target_circle = soy.widgets.Canvas(soy.textures.Texture('hud/target_circle.svg'))
+        self._target_circle.keep_aspect = True
+        self._target_circle.scaleX = 0.1
+        self._target_circle.scaleY = 0.1
+        self._target_circle.y = 0.7
+        self._target_circle.x = -0.3
+        self.append(self._crosshair)
+        self.append(self._target)
+        self.append(self._stats)
+        self.append(self._target_arrow)
+        self.append(self._target_circle)
         self.update()
         
     def update(self) :
-        svg_source = '<svg width="1600" height="1200"> \
+        svg_source = '<svg width="400" height="300"> \
   <g transform="translate({0} {1}) scale(0.1) rotate({2} 658.66714 544.37585)">\
     <path\
        style="fill:#0093ff;fill-opacity:1;stroke:#00faff;stroke-width:0.94458151px;stroke-linecap:butt;stroke-linejoin:round;stroke-opacity:1"\
@@ -29,12 +56,12 @@ class HUD(soy.widgets.Container) :
        style="fill:#0093ff;fill-opacity:1;stroke:#00faff;stroke-width:0.94458151px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"\
        d="m 841.47912,676.56059 -342.47743,2.03142 0,0.0312 -342.44956,-2.03142 0,137.38662 c 0,0 0.20846,18.11018 21.80213,42.31608 21.59366,24.20589 66.52158,18.31405 66.52158,18.31405 l 254.12585,0 0,-0.0312 254.15372,0 c 0,0 44.92792,5.89183 66.52158,-18.31405 21.59367,-24.2059 21.80213,-42.31608 21.80213,-42.31608 l 0,-137.38662 z" />\
   </g>\
-</svg>'.format(100, 100, self._rotation)
-        self._rotation += 1
+</svg>'.format(100, 100, 0)
+
+        #self._rotation += 1
+        self._target_arrow.rotation += 0.1 / 180 * math.pi
         #print(svg_source)
-        if self._rotation % 15 == 0:
-            self._dynamictexture = soy.textures.Texture(svg_source)
-            self._dynamic.texture = self._dynamictexture
+        #self._dynamictexture.source = svg_source
 
 class Planet :
     def __init__(self, name, texture, size, position, scene) :
@@ -106,7 +133,7 @@ client.window.append(soy.widgets.Projector(player.cam))
 # cont.append(hud)
 # client.window.append(cont)
 
-hud = HUD('hud/hud.svg')
+hud = HUD()
 client.window.append(hud)
 
 room['light'] = soy.bodies.Light((-2, 3, 5))
@@ -115,7 +142,6 @@ room['light'] = soy.bodies.Light((-2, 3, 5))
 box = Model('models/main_ship.obj')
 box.position = soy.atoms.Position((0, 0, 0))
 room['box'] = box
-
 
 
 earth = Planet('earth', 'textures/earthmap1k.jpg', 3, soy.atoms.Position((20, 0, 0)), room)
