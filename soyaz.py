@@ -20,6 +20,24 @@ class HUD(soy.widgets.Container) :
         self._target.scaleY = 0.2
         self._target.align = 1
         self._target.y = -0.7
+        self._target_picture_empty = soy.textures.Texture()
+        self._target_picture_asteroid = soy.textures.Texture("hud/target_type_asteroid.svg")
+        self._target_picture_planet = soy.textures.Texture("hud/target_type_planet.svg")
+        self._target_picture_ship = soy.textures.Texture("hud/target_type_ship.svg")
+        self._target_picture = soy.widgets.Canvas(self._target_picture_empty)
+        self._target_picture.keep_aspect = True
+        self._target_picture.scaleX = 0.075
+        self._target_picture.scaleY = 0.075
+        self._target_picture.align = 1
+        self._target_picture.y = -0.79
+        self._target_picture.x = -0.325
+        self._target_text_tex = soy.textures.SVGTexture()
+        self._target_text = soy.widgets.Canvas(self._target_text_tex)
+        self._target_text.keep_aspect = True
+        self._target_text.scaleX = 0.2
+        self._target_text.scaleY = 0.2
+        self._target_text.align = 1
+        self._target_text.y = -0.7
         self._stats = soy.widgets.Canvas(soy.textures.Texture('hud/shieldhull.svg'))
         self._stats.keep_aspect = True
         self._stats.scaleX = 0.2
@@ -37,36 +55,34 @@ class HUD(soy.widgets.Container) :
         self._target_circle.scaleY = 0.1
         self.append(self._crosshair)
         self.append(self._target)
+        self.append(self._target_picture)
+        self.append(self._target_text)
         self.append(self._stats)
         self.append(self._target_arrow)
         self.append(self._target_circle)
-        self.update()
-        
-    def update(self) :
-        svg_source = '<svg width="400" height="300"> \
-  <g transform="translate({0} {1}) scale(0.1) rotate({2} 658.66714 544.37585)">\
-    <path\
-       style="fill:#0093ff;fill-opacity:1;stroke:#00faff;stroke-width:0.94458151px;stroke-linecap:butt;stroke-linejoin:round;stroke-opacity:1"\
-       d="m 499.00169,219.92822 0,0.0313 -475.827294,412.1911 475.827294,0 0,-0.0312 475.85516,0 -475.85516,-412.19111 z" />\
-    <path\
-       style="fill:#0093ff;fill-opacity:1;stroke:#00faff;stroke-width:0.94458151px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"\
-       d="m 841.47912,676.56059 -342.47743,2.03142 0,0.0312 -342.44956,-2.03142 0,137.38662 c 0,0 0.20846,18.11018 21.80213,42.31608 21.59366,24.20589 66.52158,18.31405 66.52158,18.31405 l 254.12585,0 0,-0.0312 254.15372,0 c 0,0 44.92792,5.89183 66.52158,-18.31405 21.59367,-24.2059 21.80213,-42.31608 21.80213,-42.31608 l 0,-137.38662 z" />\
-  </g>\
-</svg>'.format(100, 100, 0)
-
-        #self._rotation += 1
-        #self._target_arrow.rotation += 0.1 / 180 * math.pi
-        #print(svg_source)
-        #self._dynamictexture.source = svg_source
         
     def target(self, player, objects) :
+        target_name = ""
         if player.target == -1 :
             self._target_circle.scaleX = 0
             self._target_circle.scaleY = 0
             self._target_arrow.scaleX = 0
             self._target_arrow.scaleY = 0
         else :
-            direction = soy.atoms.Vector(objects[player.target].position - player.cam.position)
+            t = objects[player.target]
+            target_name = t.name
+            
+            if isinstance(t, Asteroid) :
+                self._target_picture.texture = self._target_picture_asteroid
+            elif isinstance(t, Planet) :
+                self._target_picture.texture = self._target_picture_planet
+            elif isinstance(t, Ship) :
+                self._target_picture.texture = self._target_picture_ship
+            else :
+                self._target_picture.texture = self._target_picture_empty
+            
+            
+            direction = soy.atoms.Vector(t.position - player.cam.position)
             rot = player.rot.conjugate()
             direction = rot.rotate(direction)
             
@@ -108,6 +124,14 @@ class HUD(soy.widgets.Container) :
                 self._target_circle.scaleY = 0
                 self._target_arrow.scaleX = 0.1
                 self._target_arrow.scaleY = 0.1
+        target_svg_source = '<svg width="1000" height="500">\
+  <g transform="translate(0,-552.36218)" style="display:inline">\
+    <text xml:space="preserve" style="font-size:64px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans;-inkscape-font-specification:Sans"\
+       x="499.43494" y="791.48523" sodipodi:linespacing="125%"><tspan sodipodi:role="line"\
+         x="499.43494" y="791.48523" style="font-size:64px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;font-family:Sans;-inkscape-font-specification:Sans">{0}</tspan></text>\
+  </g>\
+</svg>'.format(target_name)
+        self._target_text_tex.source = target_svg_source
 
 class Planet :
     def __init__(self, name, texture, size, position, scene) :
@@ -117,8 +141,27 @@ class Planet :
         self.sphere.material = soy.materials.Textured(colormap=self.texture)
         self.sphere.radius = size
         self.sphere.position = position
+        self.size = size
         self.position = position
         scene[name] = self.sphere
+
+class Ship :
+    def __init__(self, name, model, size, position, scene) :
+        self.name = name
+        self.model = Model(model)
+        self.model.position = position
+        self.size = size
+        self.position = position
+        scene[name] = self.model
+
+class Asteroid :
+    def __init__(self, name, model, size, position, scene) :
+        self.name = name
+        self.model = Model(model)
+        self.model.position = position
+        self.size = size
+        self.position = position
+        scene[name] = self.model
 
 class Player :
     def __init__(self, scene) :
@@ -203,21 +246,14 @@ room['light'] = soy.bodies.Light((-2, 3, 5))
 
 objects = []
 
-box = Model('models/main_ship.obj')
-box.position = soy.atoms.Position((0, 0, 0))
-room['box'] = box
+ship = Ship('Enemy Ship', 'models/main_ship.obj', 3, soy.atoms.Position((0, 0, 0)), room)
+earth = Planet('Earth', 'textures/earthmap1k.jpg', 3, soy.atoms.Position((20, 0, 0)), room)
+asteroid = Asteroid('Asteroid', 'models/asteroid.obj', 1, soy.atoms.Position((-20, 0, 0)), room)
 
-objects.append(box)
-
-earth = Planet('earth', 'textures/earthmap1k.jpg', 3, soy.atoms.Position((20, 0, 0)), room)
 earth.sphere.addTorque(3000,3000,500)
 
+objects.append(ship)
 objects.append(earth)
-
-asteroid = Model('models/asteroid.obj')
-asteroid.position = soy.atoms.Position((-20, 0, 0))
-room['asteroid'] = asteroid
-
 objects.append(asteroid)
 
 #venus = Planet('venus', 'textures/venusmap.png', 2, soy.atoms.Position((0, 0, -50)), room)
@@ -244,7 +280,6 @@ if __name__ == '__main__' :
         hud.target(player, objects)
 
         time.sleep(.01)
-        hud.update()
 
 
 sdl2.SDL_GameControllerClose(player.controller)
