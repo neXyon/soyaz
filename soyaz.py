@@ -59,49 +59,55 @@ class HUD(soy.widgets.Container) :
         #print(svg_source)
         #self._dynamictexture.source = svg_source
         
-    def target(self, player) :
-        direction = soy.atoms.Vector(target.position - player.cam.position)
-        rot = player.rot.conjugate()
-        direction = rot.rotate(direction)
-        
-        aspect = self.size[0] / self.size[1]
-        onscreen = False
-                
-        if direction[2] < 0 :
-            res = player.cam.project(soy.atoms.Vector(direction), aspect)
-            if math.fabs(res[0]) < 1 and math.fabs(res[1]) < 1 :
-                self._target_circle.scaleX = 0.1
-                self._target_circle.scaleY = 0.1
-                self._target_arrow.scaleX = 0
-                self._target_arrow.scaleY = 0
-                self._target_circle.x = res[0] * aspect
-                self._target_circle.y = res[1]
-                scale = -11 / direction[2]
-                self._target_circle.scaleX = scale
-                self._target_circle.scaleY = scale
-                onscreen = True
-
-        if onscreen == False :
-            angle = math.atan2(direction[1], direction[0])
-            
-            self._target_arrow.rotation = angle - math.pi / 2
-            
-            x = math.cos(angle)
-            y = math.sin(angle)
-            
-            yjump = 1 / math.sqrt(aspect * aspect + 1)
-            
-            if math.fabs(y) < yjump :
-                # left or right screen edge
-                self._target_arrow.x = math.copysign(0.9 * aspect, x)
-                self._target_arrow.y = y * self._target_arrow.x / x
-            else :
-                self._target_arrow.y = math.copysign(.9, y)
-                self._target_arrow.x = x * self._target_arrow.y / y
+    def target(self, player, objects) :
+        if player.target == -1 :
             self._target_circle.scaleX = 0
             self._target_circle.scaleY = 0
-            self._target_arrow.scaleX = 0.1
-            self._target_arrow.scaleY = 0.1
+            self._target_arrow.scaleX = 0
+            self._target_arrow.scaleY = 0
+        else :
+            direction = soy.atoms.Vector(objects[player.target].position - player.cam.position)
+            rot = player.rot.conjugate()
+            direction = rot.rotate(direction)
+            
+            aspect = self.size[0] / self.size[1]
+            onscreen = False
+                    
+            if direction[2] < 0 :
+                res = player.cam.project(soy.atoms.Vector(direction), aspect)
+                if math.fabs(res[0]) < 1 and math.fabs(res[1]) < 1 :
+                    self._target_circle.scaleX = 0.1
+                    self._target_circle.scaleY = 0.1
+                    self._target_arrow.scaleX = 0
+                    self._target_arrow.scaleY = 0
+                    self._target_circle.x = res[0] * aspect
+                    self._target_circle.y = res[1]
+                    scale = -11 / direction[2]
+                    self._target_circle.scaleX = scale
+                    self._target_circle.scaleY = scale
+                    onscreen = True
+
+            if onscreen == False :
+                angle = math.atan2(direction[1], direction[0])
+                
+                self._target_arrow.rotation = angle - math.pi / 2
+                
+                x = math.cos(angle)
+                y = math.sin(angle)
+                
+                yjump = 1 / math.sqrt(aspect * aspect + 1)
+                
+                if math.fabs(y) < yjump :
+                    # left or right screen edge
+                    self._target_arrow.x = math.copysign(0.9 * aspect, x)
+                    self._target_arrow.y = y * self._target_arrow.x / x
+                else :
+                    self._target_arrow.y = math.copysign(.9, y)
+                    self._target_arrow.x = x * self._target_arrow.y / y
+                self._target_circle.scaleX = 0
+                self._target_circle.scaleY = 0
+                self._target_arrow.scaleX = 0.1
+                self._target_arrow.scaleY = 0.1
 
 class Planet :
     def __init__(self, name, texture, size, position, scene) :
@@ -122,8 +128,11 @@ class Player :
         self.shots = []
         self.last_shot = time.time()
         self.controller = sdl2.SDL_GameControllerOpen(0)
+        self.target_prev = False
+        self.target_next = False
+        self.target = -1
         
-    def update(self, dt, scene) :
+    def update(self, dt, scene, objects) :
         speed = 50
         strafe = 20
         
@@ -153,6 +162,25 @@ class Player :
             scene['shot%d' % len(self.shots)] = shot
             self.shots.append(shot)
             self.last_shot = current
+        
+        if len(objects) > 0 :
+            if sdl2.SDL_GameControllerGetButton(self.controller, 9) != self.target_prev :
+                self.target_prev = not self.target_prev
+                if self.target_prev:
+                    if self.target == -1 :
+                        self.target = 0
+                    else :
+                        self.target = (self.target + len(objects) - 1) % len(objects)
+
+            if sdl2.SDL_GameControllerGetButton(self.controller, 10) != self.target_next :
+                self.target_next = not self.target_next
+                if self.target_next:
+                    if self.target == -1 :
+                        self.target = 0
+                    else :
+                        self.target = (self.target + 1) % len(objects)
+        else :
+            self.target = -1
 
 
 sdl2.SDL_InitSubSystem(sdl2.SDL_INIT_GAMECONTROLLER)
@@ -192,8 +220,6 @@ earth.sphere.addTorque(3000,3000,500)
 
 objects.append(earth)
 
-target = objects[1]
-
 #venus = Planet('venus', 'textures/venusmap.png', 2, soy.atoms.Position((0, 0, -50)), room)
 #mercury = Planet('mercury', 'textures/mercurymap.png', 1, soy.atoms.Position((0, 0, -100)), room)
 #mars = Planet('mars', 'textures/mars_1k_color.png', 2, soy.atoms.Position((0, 0, 50)), room)
@@ -213,9 +239,9 @@ if __name__ == '__main__' :
         dt = current - last
         last = current
         
-        player.update(dt, room)
+        player.update(dt, room, objects)
         
-        hud.target(player)
+        hud.target(player, objects)
 
         #for i in range(32) :
         #    print(sdl2.SDL_GameControllerGetButton(controller, i), end='')
