@@ -196,12 +196,6 @@ room = soy.scenes.Room(1000)
 player = Player(room)
 client.window.append(soy.widgets.Projector(player.cam))
 
-# hudtexture = soy.textures.Texture('hud/hud.svg')
-# hud = soy.widgets.Canvas(hudtexture)
-# cont = soy.widgets.Container()
-# cont.append(hud)
-# client.window.append(cont)
-
 hud = HUD()
 client.window.append(hud)
 
@@ -219,6 +213,12 @@ earth = Planet('earth', 'textures/earthmap1k.jpg', 3, soy.atoms.Position((20, 0,
 earth.sphere.addTorque(3000,3000,500)
 
 objects.append(earth)
+
+asteroid = Model('models/asteroid.obj')
+asteroid.position = soy.atoms.Position((-20, 0, 0))
+room['asteroid'] = asteroid
+
+objects.append(asteroid)
 
 #venus = Planet('venus', 'textures/venusmap.png', 2, soy.atoms.Position((0, 0, -50)), room)
 #mercury = Planet('mercury', 'textures/mercurymap.png', 1, soy.atoms.Position((0, 0, -100)), room)
@@ -242,10 +242,6 @@ if __name__ == '__main__' :
         player.update(dt, room, objects)
         
         hud.target(player, objects)
-
-        #for i in range(32) :
-        #    print(sdl2.SDL_GameControllerGetButton(controller, i), end='')
-        #print('')
 
         time.sleep(.01)
         hud.update()
