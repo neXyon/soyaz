@@ -68,6 +68,7 @@ class HUD(soy.widgets.Container) :
             self._target_circle.scaleY = 0
             self._target_arrow.scaleX = 0
             self._target_arrow.scaleY = 0
+            self._target_picture.texture = self._target_picture_empty
         else :
             t = objects[player.target]
             target_name = t.name
@@ -81,14 +82,13 @@ class HUD(soy.widgets.Container) :
             else :
                 self._target_picture.texture = self._target_picture_empty
             
-            
             direction = soy.atoms.Vector(t.position - player.cam.position)
             rot = player.rot.conjugate()
             direction = rot.rotate(direction)
             
             aspect = self.size[0] / self.size[1]
             onscreen = False
-                    
+            
             if direction[2] < 0 :
                 res = player.cam.project(soy.atoms.Vector(direction), aspect)
                 if math.fabs(res[0]) < 1 and math.fabs(res[1]) < 1 :
@@ -143,6 +143,8 @@ class Planet :
         self.sphere.position = position
         self.size = size
         self.position = position
+        self.health = 10000
+        self.shield = 0
         scene[name] = self.sphere
 
 class Ship :
@@ -152,6 +154,8 @@ class Ship :
         self.model.position = position
         self.size = size
         self.position = position
+        self.health = 100
+        self.shield = 100
         scene[name] = self.model
 
 class Asteroid :
@@ -161,7 +165,16 @@ class Asteroid :
         self.model.position = position
         self.size = size
         self.position = position
+        self.health = 30
+        self.shield = 0
         scene[name] = self.model
+
+class Shot :
+    def __init__(self, position, number, birth) :
+        self.object = soy.bodies.Billboard(position, size=soy.atoms.Size((.5,.5)),material=soy.materials.Colored('gold'))
+        self.number = number
+        self.birth = birth
+        self.damage = 10
 
 class Player :
     def __init__(self, scene) :
@@ -174,6 +187,7 @@ class Player :
         self.target_prev = False
         self.target_next = False
         self.target = -1
+        self.fired = 0
         
     def update(self, dt, scene, objects) :
         speed = 50
@@ -198,11 +212,11 @@ class Player :
         sdl2.SDL_GameControllerUpdate()
         
         if self.last_shot + 0.1 < current and sdl2.SDL_GameControllerGetButton(self.controller, 8) :
-            shot = soy.bodies.Billboard(self.cam.position,
-                                        size=soy.atoms.Size((.5,.5)),material=soy.materials.Colored('gold'))
-            shot.rotation = self.rot
-            shot.addRelForce(0, 0, -1000)
-            scene['shot%d' % len(self.shots)] = shot
+            shot = Shot(self.cam.position, self.fired, current)
+            shot.object.rotation = self.rot
+            shot.object.addRelForce(0, 0, -1000)
+            scene['shot%d' % self.fired] = shot.object
+            self.fired += 1
             self.shots.append(shot)
             self.last_shot = current
         
@@ -224,6 +238,29 @@ class Player :
                         self.target = (self.target + 1) % len(objects)
         else :
             self.target = -1
+            
+        for shot in self.shots :
+            hit = False
+            
+            for obj in objects :
+                distance = soy.atoms.Vector(obj.position - shot.object.position)
+                if distance.magnitude() < obj.size :
+                    hit = True
+                    if obj.shield > 0 :
+                        obj.shield -= shot.damage
+                        if obj.shield < 0 :
+                            obj.shield = 0
+                    else :
+                        obj.health -= shot.damage
+                        if obj.health <= 0 :
+                            del scene[obj.name]
+                            objects.remove(obj)
+                            if self.target == len(objects) :
+                                self.target = -1
+            
+            if current - shot.birth > 10 or hit :
+                self.shots.remove(shot)
+                del scene['shot%d' % shot.number]
 
 
 sdl2.SDL_InitSubSystem(sdl2.SDL_INIT_GAMECONTROLLER)
