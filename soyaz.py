@@ -180,10 +180,11 @@ class Shot(SpaceObject) :
         self.birth = birth
         self.damage = 10
 
-class Player :
+class Player(SpaceObject) :
     def __init__(self, scene) :
-        self.cam = soy.bodies.Camera((0,0,10))
-        scene['cam'] = self.cam
+        position = soy.atoms.Position((0,0,10))
+        self.cam = soy.bodies.Camera(position)
+        super().__init__(self.cam, 'cam', position, 3, scene, 100, 100)
         self.rot = self.cam.rotation
         self.shots = []
         self.last_shot = time.time()
@@ -194,8 +195,6 @@ class Player :
         self.fired = 0
         self.max_health = 100
         self.max_shield = 100
-        self.health = 100
-        self.shield = 100
         
     def update(self, dt, scene, objects) :
         speed = 50
@@ -266,6 +265,17 @@ class Player :
                 self.shots.remove(shot)
                 del scene['shot%d' % shot.number]
 
+        for obj in objects :
+            if obj.collides(self) :
+                if self.shield > 0 :
+                    self.shield -= 10 * dt
+                    if self.shield < 0 :
+                        self.shield = 0
+                else :
+                    self.health -= 10 * dt
+                
+                if self.health <= 0 :
+                    quit()
 
 sdl2.SDL_InitSubSystem(sdl2.SDL_INIT_GAMECONTROLLER)
 sdl2.SDL_GameControllerEventState(sdl2.SDL_IGNORE)
