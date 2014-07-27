@@ -95,7 +95,7 @@ class HUD(soy.widgets.Container) :
             else :
                 self._target_picture.texture = self._target_picture_empty
             
-            direction = soy.atoms.Vector(t.position - player.cam.position)
+            direction = soy.atoms.Vector(t.body.position - player.cam.position)
             rot = player.rot.conjugate()
             direction = rot.rotate(direction)
             
@@ -140,45 +140,39 @@ class HUD(soy.widgets.Container) :
         self._target_text_tex.source = self._target_text_svg.format(target_name)
         self._stats_bar_tex.source = self._stats_bar_svg.format(975.05469 * player.health / player.max_health, 975.05469 * player.shield / player.max_shield)
 
-class Planet :
+
+class SpaceObject :
+    def __init__(self, body, name, position, size, scene, health, shield) :
+        self.body = body
+        self.name = name
+        self.size = size
+        self.health = health
+        self.shield = shield
+        body.position = position
+        scene[name] = body
+
+class Planet(SpaceObject) :
     def __init__(self, name, texture, size, position, scene) :
-        self.name = name
+        super().__init__(soy.bodies.Sphere(), name, position, size, scene, 1000000, 0)
         self.texture = soy.textures.Texture(texture)
-        self.sphere = soy.bodies.Sphere()
-        self.sphere.material = soy.materials.Textured(colormap=self.texture)
-        self.sphere.radius = size
-        self.sphere.position = position
-        self.size = size
-        self.position = position
-        self.health = 10000
-        self.shield = 0
-        scene[name] = self.sphere
+        self.body.material = soy.materials.Textured(colormap=self.texture)
+        self.body.radius = size
 
-class Ship :
+class Ship(SpaceObject) :
     def __init__(self, name, model, size, position, scene) :
-        self.name = name
-        self.model = Model(model)
-        self.model.position = position
-        self.size = size
-        self.position = position
-        self.health = 100
-        self.shield = 100
-        scene[name] = self.model
+        super().__init__(Model(model), name, position, size, scene, 100, 100)
 
-class Asteroid :
+class Asteroid(SpaceObject) :
     def __init__(self, name, model, size, position, scene) :
-        self.name = name
-        self.model = Model(model)
-        self.model.position = position
-        self.size = size
-        self.position = position
-        self.health = 30
-        self.shield = 0
-        scene[name] = self.model
+        super().__init__(Model(model), name, position, size, scene, 30, 0)
 
-class Shot :
-    def __init__(self, position, number, birth) :
-        self.object = soy.bodies.Billboard(position, size=soy.atoms.Size((.5,.5)),material=soy.materials.Colored('gold'))
+class Shot(SpaceObject) :
+    def __init__(self, position, number, birth, rotation, scene) :
+        body = soy.bodies.Billboard(position, size=soy.atoms.Size((.5,.5)),material=soy.materials.Colored('gold'))
+        name = 'shot{0}'.format(number)
+        super().__init__(body, name, position, 0, scene, 0, 0)
+        self.body.rotation = rotation
+        self.body.addRelForce(0, 0, -1000)
         self.number = number
         self.birth = birth
         self.damage = 10
@@ -223,10 +217,7 @@ class Player :
         sdl2.SDL_GameControllerUpdate()
         
         if self.last_shot + 0.1 < current and sdl2.SDL_GameControllerGetButton(self.controller, 8) :
-            shot = Shot(self.cam.position, self.fired, current)
-            shot.object.rotation = self.rot
-            shot.object.addRelForce(0, 0, -1000)
-            scene['shot%d' % self.fired] = shot.object
+            shot = Shot(self.cam.position, self.fired, current, self.rot, scene)
             self.fired += 1
             self.shots.append(shot)
             self.last_shot = current
@@ -254,7 +245,7 @@ class Player :
             hit = False
             
             for obj in objects :
-                distance = soy.atoms.Vector(obj.position - shot.object.position)
+                distance = soy.atoms.Vector(obj.body.position - shot.body.position)
                 if distance.magnitude() < obj.size :
                     hit = True
                     if obj.shield > 0 :
@@ -298,7 +289,7 @@ ship = Ship('Enemy Ship', 'models/main_ship.obj', 3, soy.atoms.Position((0, 0, 0
 earth = Planet('Earth', 'textures/earthmap1k.jpg', 3, soy.atoms.Position((20, 0, 0)), room)
 asteroid = Asteroid('Asteroid', 'models/asteroid.obj', 1, soy.atoms.Position((-20, 0, 0)), room)
 
-earth.sphere.addTorque(3000,3000,500)
+earth.body.addTorque(3000,3000,500)
 
 objects.append(ship)
 objects.append(earth)
