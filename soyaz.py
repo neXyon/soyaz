@@ -171,7 +171,7 @@ class Asteroid(SpaceObject) :
 
 class Shot(SpaceObject) :
     def __init__(self, position, number, birth, rotation, scene) :
-        body = soy.bodies.Billboard(position, size=soy.atoms.Size((.5,.5)),material=soy.materials.Colored('gold'))
+        body = soy.bodies.Billboard(position, size=soy.atoms.Size((.5,.5)),material=soy.materials.Textured(colormap = soy.textures.Texture('textures/shot.png')))
         name = 'shot{0}'.format(number)
         super().__init__(body, name, position, 0, scene, 0, 0)
         self.body.rotation = rotation
