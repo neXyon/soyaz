@@ -32,6 +32,8 @@ class HUD(soy.widgets.Container) :
         self._target_picture.y = -0.79
         self._target_picture.x = -0.325
         self._target_text_tex = soy.textures.SVGTexture()
+        with open("hud/hud_target_text.svg", "r") as file:
+            self._target_text_svg = file.read()
         self._target_text = soy.widgets.Canvas(self._target_text_tex)
         self._target_text.keep_aspect = True
         self._target_text.scaleX = 0.2
@@ -53,11 +55,22 @@ class HUD(soy.widgets.Container) :
         self._target_circle.keep_aspect = True
         self._target_circle.scaleX = 0.1
         self._target_circle.scaleY = 0.1
+        with open("hud/shieldhull_full.svg", "r") as file:
+            self._stats_bar_svg = file.read()
+        self._stats_bar_tex = soy.textures.SVGTexture()
+        self._stats_bar = soy.widgets.Canvas(self._stats_bar_tex)
+        self._stats_bar.keep_aspect = True
+        self._stats_bar.scaleX = 0.2
+        self._stats_bar.scaleY = 0.2
+        self._stats_bar.align = -1
+        self._stats_bar.y = -0.7
+        
         self.append(self._crosshair)
         self.append(self._target)
         self.append(self._target_picture)
         self.append(self._target_text)
         self.append(self._stats)
+        self.append(self._stats_bar)
         self.append(self._target_arrow)
         self.append(self._target_circle)
         
@@ -124,14 +137,8 @@ class HUD(soy.widgets.Container) :
                 self._target_circle.scaleY = 0
                 self._target_arrow.scaleX = 0.1
                 self._target_arrow.scaleY = 0.1
-        target_svg_source = '<svg width="1000" height="500">\
-  <g transform="translate(0,-552.36218)" style="display:inline">\
-    <text xml:space="preserve" style="font-size:64px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;letter-spacing:0px;word-spacing:0px;writing-mode:lr-tb;text-anchor:middle;fill:#000000;fill-opacity:1;stroke:none;font-family:Sans;-inkscape-font-specification:Sans"\
-       x="499.43494" y="791.48523" sodipodi:linespacing="125%"><tspan sodipodi:role="line"\
-         x="499.43494" y="791.48523" style="font-size:64px;font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;text-align:center;line-height:125%;writing-mode:lr-tb;text-anchor:middle;font-family:Sans;-inkscape-font-specification:Sans">{0}</tspan></text>\
-  </g>\
-</svg>'.format(target_name)
-        self._target_text_tex.source = target_svg_source
+        self._target_text_tex.source = self._target_text_svg.format(target_name)
+        self._stats_bar_tex.source = self._stats_bar_svg.format(975.05469 * player.health / player.max_health, 975.05469 * player.shield / player.max_shield)
 
 class Planet :
     def __init__(self, name, texture, size, position, scene) :
@@ -188,6 +195,10 @@ class Player :
         self.target_next = False
         self.target = -1
         self.fired = 0
+        self.max_health = 100
+        self.max_shield = 100
+        self.health = 100
+        self.shield = 100
         
     def update(self, dt, scene, objects) :
         speed = 50
