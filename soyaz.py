@@ -150,6 +150,9 @@ class SpaceObject :
         self.shield = shield
         body.position = position
         scene[name] = body
+    def collides(self, other) :
+        distance = self.body.position - other.body.position
+        return distance.x * distance.x + distance.y * distance.y + distance.z * distance.z < (self.size + other.size) * (self.size + other.size)
 
 class Planet(SpaceObject) :
     def __init__(self, name, texture, size, position, scene) :
@@ -245,8 +248,7 @@ class Player :
             hit = False
             
             for obj in objects :
-                distance = soy.atoms.Vector(obj.body.position - shot.body.position)
-                if distance.magnitude() < obj.size :
+                if obj.collides(shot) :
                     hit = True
                     if obj.shield > 0 :
                         obj.shield -= shot.damage
