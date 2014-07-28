@@ -159,7 +159,13 @@ class HUD(soy.widgets.Container) :
                 self._target_arrow.scaleY = 0.1
         self._target_text_tex.source = self._target_text_svg.format(target_name)
         self._score_text_tex.source = self._stats_text_svg.format('{0}'.format(player.score))
-        self._time_text_tex.source = self._stats_text_svg.format('{0}'.format(time))
+        
+        time = player.maxtime - time
+        
+        minutes = math.floor(time / 60)
+        seconds = math.floor(math.fmod(time, 60))
+        
+        self._time_text_tex.source = self._stats_text_svg.format('{0}:{1:02d}'.format(minutes, seconds))
         self._stats_bar_tex.source = self._stats_bar_svg.format(975.05469 * player.health / player.max_health, 975.05469 * player.shield / player.max_shield)
 
 
@@ -223,8 +229,9 @@ class Player(SpaceObject) :
         self.max_health = 100
         self.max_shield = 100
         self.score = 0
+        self.maxtime = 60
         
-    def update(self, dt, scene, objects) :
+    def update(self, runtime, dt, scene, objects) :
         speed = 50
         strafe = 20
         
@@ -297,14 +304,20 @@ class Player(SpaceObject) :
         for obj in objects :
             if obj.collides(self) :
                 if self.shield > 0 :
-                    self.shield -= 10 * dt
+                    self.shield -= 10
                     if self.shield < 0 :
                         self.shield = 0
                 else :
-                    self.health -= 10 * dt
-                
+                    self.health -= 10
+                    
                 if self.health <= 0 :
                     quit()
+
+                del scene[obj.name]
+                objects.remove(obj)
+        
+        if runtime > self.maxtime :
+            quit()
 
 sdl2.SDL_InitSubSystem(sdl2.SDL_INIT_GAMECONTROLLER)
 sdl2.SDL_GameControllerEventState(sdl2.SDL_IGNORE)
@@ -370,7 +383,7 @@ if __name__ == '__main__' :
         dt = current - last
         last = current
         
-        player.update(dt, room, objects)
+        player.update(current - start, dt, room, objects)
         
         hud.update(player, objects, current - start)
 
