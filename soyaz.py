@@ -295,6 +295,15 @@ client.window.append(hud)
 
 room['light'] = soy.bodies.Light((-2, 3, 5))
 
+background = soy.textures.Cubemap()
+background.front = soy.textures.Texture('textures/front.png')
+background.back = soy.textures.Texture('textures/back.png')
+background.up = soy.textures.Texture('textures/top.png')
+background.down = soy.textures.Texture('textures/bottom.png')
+background.left = soy.textures.Texture('textures/left.png')
+background.right = soy.textures.Texture('textures/right.png')
+room.skybox = background
+
 objects = []
 
 ship = Ship('Enemy Ship', 'models/main_ship.obj', 3.5, soy.atoms.Position((0, 0, 0)), room)
