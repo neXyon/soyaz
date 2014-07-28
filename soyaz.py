@@ -6,6 +6,8 @@ import sys
 import time
 import math
 import os.path
+import random
+import copy
 from model import Model
 
 class HUD(soy.widgets.Container) :
@@ -64,6 +66,22 @@ class HUD(soy.widgets.Container) :
         self._stats_bar.scaleY = 0.2
         self._stats_bar.align = -1
         self._stats_bar.y = -0.7
+        self._score_text_tex = soy.textures.SVGTexture()
+        self._score_text = soy.widgets.Canvas(self._score_text_tex)
+        self._score_text.keep_aspect = True
+        self._score_text.scaleX = 0.2
+        self._score_text.scaleY = 0.2
+        self._score_text.align = 1
+        self._score_text.y = 0.9
+        self._time_text_tex = soy.textures.SVGTexture()
+        self._time_text = soy.widgets.Canvas(self._time_text_tex)
+        self._time_text.keep_aspect = True
+        self._time_text.scaleX = 0.2
+        self._time_text.scaleY = 0.2
+        self._time_text.align = -1
+        self._time_text.y = 0.9
+        with open("hud/stats_text.svg", "r") as file:
+            self._stats_text_svg = file.read()
         
         self.append(self._crosshair)
         self.append(self._target)
@@ -73,8 +91,10 @@ class HUD(soy.widgets.Container) :
         self.append(self._stats_bar)
         self.append(self._target_arrow)
         self.append(self._target_circle)
+        self.append(self._score_text)
+        self.append(self._time_text)
         
-    def target(self, player, objects) :
+    def update(self, player, objects, time) :
         target_name = ""
         if player.target == -1 :
             self._target_circle.scaleX = 0
@@ -138,6 +158,8 @@ class HUD(soy.widgets.Container) :
                 self._target_arrow.scaleX = 0.1
                 self._target_arrow.scaleY = 0.1
         self._target_text_tex.source = self._target_text_svg.format(target_name)
+        self._score_text_tex.source = self._stats_text_svg.format('{0}'.format(player.score))
+        self._time_text_tex.source = self._stats_text_svg.format('{0}'.format(time))
         self._stats_bar_tex.source = self._stats_bar_svg.format(975.05469 * player.health / player.max_health, 975.05469 * player.shield / player.max_shield)
 
 
@@ -166,8 +188,13 @@ class Ship(SpaceObject) :
         super().__init__(Model(model), name, position, size, scene, 100, 100)
 
 class Asteroid(SpaceObject) :
+    model = None
+    
     def __init__(self, name, model, size, position, scene) :
-        super().__init__(Model(model), name, position, size, scene, 30, 0)
+        if Asteroid.model is None :
+            Asteroid.model = Model(model)
+        
+        super().__init__(copy.deepcopy(Asteroid.model), name, position, size, scene, 30, 0)
 
 class Shot(SpaceObject) :
     def __init__(self, position, number, birth, rotation, scene) :
@@ -195,6 +222,7 @@ class Player(SpaceObject) :
         self.fired = 0
         self.max_health = 100
         self.max_shield = 100
+        self.score = 0
         
     def update(self, dt, scene, objects) :
         speed = 50
@@ -256,6 +284,7 @@ class Player(SpaceObject) :
                     else :
                         obj.health -= shot.damage
                         if obj.health <= 0 :
+                            self.score += 1
                             del scene[obj.name]
                             objects.remove(obj)
                             if self.target == len(objects) :
@@ -306,15 +335,20 @@ room.skybox = background
 
 objects = []
 
-ship = Ship('Enemy Ship', 'models/main_ship.obj', 3.5, soy.atoms.Position((0, 0, 0)), room)
-earth = Planet('Earth', 'textures/earthmap1k.jpg', 3, soy.atoms.Position((20, 0, 0)), room)
-asteroid = Asteroid('Asteroid', 'models/asteroid.obj', 1.5, soy.atoms.Position((-20, 0, 0)), room)
+#ship = Ship('Enemy Ship', 'models/main_ship.obj', 3.5, soy.atoms.Position((0, 0, 0)), room)
+#earth = Planet('Earth', 'textures/earthmap1k.jpg', 3, soy.atoms.Position((20, 0, 0)), room)
 
-earth.body.addTorque(3000,3000,500)
+#earth.body.addTorque(3000,3000,500)
 
-objects.append(ship)
-objects.append(earth)
-objects.append(asteroid)
+#objects.append(ship)
+#objects.append(earth)
+
+for i in range(100) :
+    pos = []
+    for j in range(3) :
+        pos.append(random.random() * 200 - 100)
+    asteroid = Asteroid('Asteroid {0}'.format(i), 'models/asteroid.obj', 1.5, soy.atoms.Position(pos), room)
+    objects.append(asteroid)
 
 #venus = Planet('venus', 'textures/venusmap.png', 2, soy.atoms.Position((0, 0, -50)), room)
 #mercury = Planet('mercury', 'textures/mercurymap.png', 1, soy.atoms.Position((0, 0, -100)), room)
@@ -324,7 +358,8 @@ objects.append(asteroid)
 #uranus = Planet('uranus', 'textures/uranusmap.png', 7, soy.atoms.Position((0, 0, 200)), room)
 #neptune = Planet('neptune', 'textures/neptunemap.png', 7, soy.atoms.Position((0, 0, 250)), room)
 
-last = time.time()
+start = time.time()
+last = start
 
 #__import__("code").interact(local=locals())
 
@@ -337,7 +372,7 @@ if __name__ == '__main__' :
         
         player.update(dt, room, objects)
         
-        hud.target(player, objects)
+        hud.update(player, objects, current - start)
 
         time.sleep(.01)
 
