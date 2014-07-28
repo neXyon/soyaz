@@ -111,7 +111,7 @@ class HUD(soy.widgets.Container) :
                     self._target_arrow.scaleY = 0
                     self._target_circle.x = res[0] * aspect
                     self._target_circle.y = res[1]
-                    scale = -11 / direction[2]
+                    scale = -4 * t.size / direction[2]
                     self._target_circle.scaleX = scale
                     self._target_circle.scaleY = scale
                     onscreen = True
@@ -297,9 +297,9 @@ room['light'] = soy.bodies.Light((-2, 3, 5))
 
 objects = []
 
-ship = Ship('Enemy Ship', 'models/main_ship.obj', 3, soy.atoms.Position((0, 0, 0)), room)
+ship = Ship('Enemy Ship', 'models/main_ship.obj', 3.5, soy.atoms.Position((0, 0, 0)), room)
 earth = Planet('Earth', 'textures/earthmap1k.jpg', 3, soy.atoms.Position((20, 0, 0)), room)
-asteroid = Asteroid('Asteroid', 'models/asteroid.obj', 1, soy.atoms.Position((-20, 0, 0)), room)
+asteroid = Asteroid('Asteroid', 'models/asteroid.obj', 1.5, soy.atoms.Position((-20, 0, 0)), room)
 
 earth.body.addTorque(3000,3000,500)
 
