@@ -96,26 +96,25 @@ class HUD(soy.widgets.Container) :
         
     def update(self, player, objects, time) :
         target_name = ""
-        if player.target == -1 :
+        if player.target == None :
             self._target_circle.scaleX = 0
             self._target_circle.scaleY = 0
             self._target_arrow.scaleX = 0
             self._target_arrow.scaleY = 0
             self._target_picture.texture = self._target_picture_empty
         else :
-            t = objects[player.target]
-            target_name = t.name
+            target_name = player.target.name
             
-            if isinstance(t, Asteroid) :
+            if isinstance(player.target, Asteroid) :
                 self._target_picture.texture = self._target_picture_asteroid
-            elif isinstance(t, Planet) :
+            elif isinstance(player.target, Planet) :
                 self._target_picture.texture = self._target_picture_planet
-            elif isinstance(t, Ship) :
+            elif isinstance(player.target, Ship) :
                 self._target_picture.texture = self._target_picture_ship
             else :
                 self._target_picture.texture = self._target_picture_empty
             
-            direction = soy.atoms.Vector(t.body.position - player.cam.position)
+            direction = soy.atoms.Vector(player.target.body.position - player.cam.position)
             rot = player.rot.conjugate()
             direction = rot.rotate(direction)
             
@@ -131,7 +130,7 @@ class HUD(soy.widgets.Container) :
                     self._target_arrow.scaleY = 0
                     self._target_circle.x = res[0] * aspect
                     self._target_circle.y = res[1]
-                    scale = -4 * t.size / direction[2]
+                    scale = -4 * player.target.size / direction[2]
                     self._target_circle.scaleX = scale
                     self._target_circle.scaleY = scale
                     onscreen = True
@@ -222,14 +221,35 @@ class Player(SpaceObject) :
         self.shots = []
         self.last_shot = time.time()
         self.controller = sdl2.SDL_GameControllerOpen(0)
-        self.target_prev = False
-        self.target_next = False
-        self.target = -1
+        self.target_clicked = False
+        self.target = None
         self.fired = 0
         self.max_health = 100
         self.max_shield = 100
         self.score = 0
         self.maxtime = 60
+        
+    def select_target(self, objects) :
+        if len(objects) == 0 :
+            self.target = None
+            return
+
+        best = 1e10
+        prev = self.target
+        
+        for i, t in enumerate(objects) :
+            if t == prev :
+                continue
+            
+            direction = soy.atoms.Vector(t.body.position - self.cam.position)
+            rot = self.rot.conjugate()
+            direction = soy.atoms.Vector(rot.rotate(direction))
+            length = direction.magnitude()
+            angle = direction.z / length + 1
+            weighted = angle * length
+            if weighted < best :
+                self.target = t
+                best = weighted
         
     def update(self, runtime, dt, scene, objects) :
         speed = 50
@@ -253,30 +273,16 @@ class Player(SpaceObject) :
 
         sdl2.SDL_GameControllerUpdate()
         
-        if self.last_shot + 0.1 < current and sdl2.SDL_GameControllerGetButton(self.controller, 8) :
+        if self.last_shot + 0.1 < current and sdl2.SDL_GameControllerGetButton(self.controller, 10) :
             shot = Shot(self.cam.position, self.fired, current, self.rot, scene)
             self.fired += 1
             self.shots.append(shot)
             self.last_shot = current
         
-        if len(objects) > 0 :
-            if sdl2.SDL_GameControllerGetButton(self.controller, 9) != self.target_prev :
-                self.target_prev = not self.target_prev
-                if self.target_prev:
-                    if self.target == -1 :
-                        self.target = 0
-                    else :
-                        self.target = (self.target + len(objects) - 1) % len(objects)
-
-            if sdl2.SDL_GameControllerGetButton(self.controller, 10) != self.target_next :
-                self.target_next = not self.target_next
-                if self.target_next:
-                    if self.target == -1 :
-                        self.target = 0
-                    else :
-                        self.target = (self.target + 1) % len(objects)
-        else :
-            self.target = -1
+        if sdl2.SDL_GameControllerGetButton(self.controller, 9) != self.target_clicked :
+            self.target_clicked = not self.target_clicked
+            if self.target_clicked :
+                self.select_target(objects)
             
         for shot in self.shots :
             hit = False
@@ -294,8 +300,8 @@ class Player(SpaceObject) :
                             self.score += 1
                             del scene[obj.name]
                             objects.remove(obj)
-                            if self.target == len(objects) :
-                                self.target = -1
+                            if self.target == obj :
+                                self.select_target(objects)
             
             if current - shot.birth > 10 or hit :
                 self.shots.remove(shot)
