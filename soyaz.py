@@ -334,14 +334,14 @@ if not sdl2.SDL_IsGameController(0) :
     sys.exit(1)
 
 client = soy.Client()
-room = soy.scenes.Room(1000)
-player = Player(room)
+scene = soy.scenes.Space(1000)
+player = Player(scene)
 client.window.append(soy.widgets.Projector(player.cam))
 
 hud = HUD()
 client.window.append(hud)
 
-room['light'] = soy.bodies.Light((-2, 3, 5))
+scene['light'] = soy.bodies.Light((-2, 3, 5))
 
 background = soy.textures.Cubemap()
 background.front = soy.textures.Texture('textures/front.png')
@@ -350,14 +350,14 @@ background.up = soy.textures.Texture('textures/top.png')
 background.down = soy.textures.Texture('textures/bottom.png')
 background.left = soy.textures.Texture('textures/left.png')
 background.right = soy.textures.Texture('textures/right.png')
-room.skybox = background
+scene.skybox = background
 
 objects = []
 
-#ship = Ship('Enemy Ship', 'models/main_ship.obj', 3.5, soy.atoms.Position((0, 0, 0)), room)
-#earth = Planet('Earth', 'textures/earthmap1k.jpg', 3, soy.atoms.Position((20, 0, 0)), room)
+#ship = Ship('Enemy Ship', 'models/main_ship.obj', 3.5, soy.atoms.Position((0, 0, 0)), scene)
+earth = Planet('Earth', 'textures/earthmap1k.jpg', 500, soy.atoms.Position((0, 0, -600)), scene)
 
-#earth.body.addTorque(3000,3000,500)
+earth.body.addTorque(3000,3000,500)
 
 #objects.append(ship)
 #objects.append(earth)
@@ -366,16 +366,16 @@ for i in range(100) :
     pos = []
     for j in range(3) :
         pos.append(random.random() * 200 - 100)
-    asteroid = Asteroid('Asteroid {0}'.format(i), 'models/asteroid.obj', 1.5, soy.atoms.Position(pos), room)
+    asteroid = Asteroid('Asteroid {0}'.format(i), 'models/asteroid.obj', 1.5, soy.atoms.Position(pos), scene)
     objects.append(asteroid)
 
-#venus = Planet('venus', 'textures/venusmap.png', 2, soy.atoms.Position((0, 0, -50)), room)
-#mercury = Planet('mercury', 'textures/mercurymap.png', 1, soy.atoms.Position((0, 0, -100)), room)
-#mars = Planet('mars', 'textures/mars_1k_color.png', 2, soy.atoms.Position((0, 0, 50)), room)
-#jupiter = Planet('jupiter', 'textures/jupitermap.png', 10, soy.atoms.Position((0, 0, 100)), room)
-#saturn = Planet('saturn', 'textures/saturnmap.png', 9, soy.atoms.Position((0, 0, 150)), room)
-#uranus = Planet('uranus', 'textures/uranusmap.png', 7, soy.atoms.Position((0, 0, 200)), room)
-#neptune = Planet('neptune', 'textures/neptunemap.png', 7, soy.atoms.Position((0, 0, 250)), room)
+#venus = Planet('venus', 'textures/venusmap.png', 2, soy.atoms.Position((0, 0, -50)), scene)
+#mercury = Planet('mercury', 'textures/mercurymap.png', 1, soy.atoms.Position((0, 0, -100)), scene)
+#mars = Planet('mars', 'textures/mars_1k_color.png', 2, soy.atoms.Position((0, 0, 50)), scene)
+#jupiter = Planet('jupiter', 'textures/jupitermap.png', 10, soy.atoms.Position((0, 0, 100)), scene)
+#saturn = Planet('saturn', 'textures/saturnmap.png', 9, soy.atoms.Position((0, 0, 150)), scene)
+#uranus = Planet('uranus', 'textures/uranusmap.png', 7, soy.atoms.Position((0, 0, 200)), scene)
+#neptune = Planet('neptune', 'textures/neptunemap.png', 7, soy.atoms.Position((0, 0, 250)), scene)
 
 start = time.time()
 last = start
@@ -389,7 +389,7 @@ if __name__ == '__main__' :
         dt = current - last
         last = current
         
-        player.update(current - start, dt, room, objects)
+        player.update(current - start, dt, scene, objects)
         
         hud.update(player, objects, current - start)
 
