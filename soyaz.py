@@ -334,7 +334,7 @@ if not sdl2.SDL_IsGameController(0) :
     sys.exit(1)
 
 client = soy.Client()
-scene = soy.scenes.Space(1000)
+scene = soy.scenes.Space(2 ** 24)
 player = Player(scene)
 client.window.append(soy.widgets.Projector(player.cam))
 
@@ -355,7 +355,7 @@ scene.skybox = background
 objects = []
 
 #ship = Ship('Enemy Ship', 'models/main_ship.obj', 3.5, soy.atoms.Position((0, 0, 0)), scene)
-earth = Planet('Earth', 'textures/earthmap1k.jpg', 500, soy.atoms.Position((0, 0, -600)), scene)
+earth = Planet('Earth', 'textures/earthmap1k.jpg', 50000, soy.atoms.Position((0, 0, -60000)), scene)
 
 earth.body.addTorque(3000,3000,500)
 
