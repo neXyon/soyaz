@@ -227,7 +227,7 @@ class Player(SpaceObject) :
         self.max_health = 100
         self.max_shield = 100
         self.score = 0
-        self.maxtime = 60
+        self.maxtime = 600
         
     def select_target(self, objects) :
         if len(objects) == 0 :
@@ -334,14 +334,12 @@ if not sdl2.SDL_IsGameController(0) :
     sys.exit(1)
 
 client = soy.Client()
-scene = soy.scenes.Space(2 ** 24)
+scene = soy.scenes.Space(2 ** 24, 1000)
 player = Player(scene)
 client.window.append(soy.widgets.Projector(player.cam))
 
 hud = HUD()
 client.window.append(hud)
-
-scene['light'] = soy.bodies.Light((-2, 3, 5))
 
 background = soy.textures.Cubemap()
 background.front = soy.textures.Texture('textures/front.png')
@@ -356,6 +354,7 @@ objects = []
 
 #ship = Ship('Enemy Ship', 'models/main_ship.obj', 3.5, soy.atoms.Position((0, 0, 0)), scene)
 earth = Planet('Earth', 'textures/earthmap1k.jpg', 50000, soy.atoms.Position((0, 0, -60000)), scene)
+scene.setDistance('Earth', 100000)
 
 earth.body.addTorque(3000,3000,500)
 
