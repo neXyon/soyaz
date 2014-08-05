@@ -207,7 +207,7 @@ class Shot(SpaceObject) :
         name = 'shot{0}'.format(number)
         super().__init__(body, name, position, 0, scene, 0, 0)
         self.body.rotation = rotation
-        self.body.addRelForce(0, 0, -1000)
+        self.body.addRelForce(0, 0, -5000)
         self.number = number
         self.birth = birth
         self.damage = 10
@@ -333,8 +333,10 @@ if not sdl2.SDL_IsGameController(0) :
     print('No game controller found!')
     sys.exit(1)
 
+scale = 500
+
 client = soy.Client()
-scene = soy.scenes.Space(2 ** 24, 1000)
+scene = soy.scenes.Space(2 ** 24, scale)
 player = Player(scene)
 client.window.append(soy.widgets.Projector(player.cam))
 
@@ -361,12 +363,19 @@ earth.body.addTorque(3000,3000,500)
 #objects.append(ship)
 #objects.append(earth)
 
-for i in range(100) :
+def createAsteroid(name) :
     pos = []
     for j in range(3) :
-        pos.append(random.random() * 200 - 100)
-    asteroid = Asteroid('Asteroid {0}'.format(i), 'models/asteroid.obj', 1.5, soy.atoms.Position(pos), scene)
+        pos.append((random.random() * 3 - 1) * scale)
+    asteroid = Asteroid(name, 'models/asteroid.obj', 1.5, soy.atoms.Position(pos), scene)
     objects.append(asteroid)
+    scene.setKeep(name, False)
+    scene.setDistance(name, scale * 1.5)
+
+for i in range(100) :
+    createAsteroid('Asteroid {0}'.format(i))
+
+free_asteroids = []
 
 #venus = Planet('venus', 'textures/venusmap.png', 2, soy.atoms.Position((0, 0, -50)), scene)
 #mercury = Planet('mercury', 'textures/mercurymap.png', 1, soy.atoms.Position((0, 0, -100)), scene)
@@ -391,6 +400,15 @@ if __name__ == '__main__' :
         player.update(current - start, dt, scene, objects)
         
         hud.update(player, objects, current - start)
+        
+        free_asteroids.extend(scene.pollRemoved())
+            
+        transitions = scene.pollCells()
+        if len(transitions) > 0 :
+            for name in free_asteroids :
+                createAsteroid(name)
+            free_asteroids.clear()
+            
 
         time.sleep(.01)
 
