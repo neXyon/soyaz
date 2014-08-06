@@ -82,8 +82,19 @@ class HUD(soy.widgets.Container) :
         self._time_text.y = 0.9
         with open("hud/stats_text.svg", "r") as file:
             self._stats_text_svg = file.read()
+        self._distance_text_tex = soy.textures.SVGTexture()
+        self._distance_text = soy.widgets.Canvas(self._distance_text_tex)
+        self._distance_text.keep_aspect = True
+        self._distance_text.scaleX = 0.1
+        self._distance_text.scaleY = 0.1
+        self._distance_text.align = 0
+        self._distance_text.x = -0.1
+        self._distance_text.y = -0.08
+        with open("hud/distance.svg", "r") as file:
+            self._distance_text_svg = file.read()
         
         self.append(self._crosshair)
+        self.append(self._distance_text)
         self.append(self._target)
         self.append(self._target_picture)
         self.append(self._target_text)
@@ -102,6 +113,7 @@ class HUD(soy.widgets.Container) :
             self._target_arrow.scaleX = 0
             self._target_arrow.scaleY = 0
             self._target_picture.texture = self._target_picture_empty
+            self._distance_text_tex.source = self._stats_text_svg.format('')
         else :
             target_name = player.target.name
             
@@ -115,12 +127,15 @@ class HUD(soy.widgets.Container) :
                 self._target_picture.texture = self._target_picture_empty
             
             direction = soy.atoms.Vector(player.target.body.position - player.cam.position)
+            distance = direction.magnitude()
             rot = player.rot.conjugate()
             direction = rot.rotate(direction)
             
             aspect = self.size[0] / self.size[1]
             onscreen = False
             
+            self._distance_text_tex.source = self._stats_text_svg.format('{0:.1f}'.format(distance))
+
             if direction[2] < 0 :
                 res = player.cam.project(soy.atoms.Vector(direction), aspect)
                 if math.fabs(res[0]) < 1 and math.fabs(res[1]) < 1 :
@@ -227,7 +242,7 @@ class Player(SpaceObject) :
         self.max_health = 100
         self.max_shield = 100
         self.score = 0
-        self.maxtime = 600
+        self.maxtime = 300
         
     def select_target(self, objects) :
         if len(objects) == 0 :
@@ -246,7 +261,7 @@ class Player(SpaceObject) :
             direction = soy.atoms.Vector(rot.rotate(direction))
             length = direction.magnitude()
             angle = direction.z / length + 1
-            weighted = angle * length
+            weighted = angle + (length / 200)
             if weighted < best :
                 self.target = t
                 best = weighted
