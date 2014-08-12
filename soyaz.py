@@ -266,7 +266,7 @@ class Player(SpaceObject) :
                 self.target = t
                 best = weighted
         
-    def update(self, runtime, dt, scene, objects) :
+    def update(self, runtime, dt, scene, objects, free_asteroids) :
         speed = 50
         strafe = 20
         
@@ -313,6 +313,7 @@ class Player(SpaceObject) :
                         obj.health -= shot.damage
                         if obj.health <= 0 :
                             self.score += 1
+                            free_asteroids.append(obj.name)
                             del scene[obj.name]
                             objects.remove(obj)
                             if self.target == obj :
@@ -334,6 +335,7 @@ class Player(SpaceObject) :
                 if self.health <= 0 :
                     quit()
 
+                free_asteroids.append(obj.name)
                 del scene[obj.name]
                 objects.remove(obj)
         
@@ -380,12 +382,15 @@ earth.body.addTorque(3000,3000,500)
 
 def createAsteroid(name) :
     pos = []
+    rot = []
     for j in range(3) :
         pos.append((random.random() * 3 - 1) * scale)
+        rot.append((random.random() * 2 - 1) * 10)
     asteroid = Asteroid(name, 'models/asteroid.obj', 1.5, soy.atoms.Position(pos), scene)
+    asteroid.body.addTorque(rot[0], rot[1], rot[2])
     objects.append(asteroid)
     scene.setKeep(name, False)
-    scene.setDistance(name, scale * 1.5)
+    scene.setDistance(name, scale * 2)
 
 for i in range(100) :
     createAsteroid('Asteroid {0}'.format(i))
@@ -412,11 +417,16 @@ if __name__ == '__main__' :
         dt = current - last
         last = current
         
-        player.update(current - start, dt, scene, objects)
+        player.update(current - start, dt, scene, objects, free_asteroids)
         
         hud.update(player, objects, current - start)
         
-        free_asteroids.extend(scene.pollRemoved())
+        rem = scene.pollRemoved()
+        for name in rem :
+            for i, t in enumerate(objects) :
+                if t.name == name :
+                    del objects[i]
+        free_asteroids.extend(rem)
             
         transitions = scene.pollCells()
         if len(transitions) > 0 :
