@@ -92,9 +92,18 @@ class HUD(soy.widgets.Container) :
         self._distance_text.y = -0.08
         with open("hud/distance.svg", "r") as file:
             self._distance_text_svg = file.read()
+        self._speed_text_tex = soy.textures.SVGTexture()
+        self._speed_text = soy.widgets.Canvas(self._speed_text_tex)
+        self._speed_text.keep_aspect = True
+        self._speed_text.scaleX = 0.1
+        self._speed_text.scaleY = 0.1
+        self._speed_text.align = 0
+        self._speed_text.x = 0.1
+        self._speed_text.y = -0.08
         
         self.append(self._crosshair)
         self.append(self._distance_text)
+        self.append(self._speed_text)
         self.append(self._target)
         self.append(self._target_picture)
         self.append(self._target_text)
@@ -105,9 +114,9 @@ class HUD(soy.widgets.Container) :
         self.append(self._score_text)
         self.append(self._time_text)
         
-    def update(self, player, objects, time) :
+    def update(self, game) :
         target_name = ""
-        if player.target == None :
+        if game.player.target == None :
             self._target_circle.scaleX = 0
             self._target_circle.scaleY = 0
             self._target_arrow.scaleX = 0
@@ -115,20 +124,20 @@ class HUD(soy.widgets.Container) :
             self._target_picture.texture = self._target_picture_empty
             self._distance_text_tex.source = self._stats_text_svg.format('')
         else :
-            target_name = player.target.name
+            target_name = game.player.target.name
             
-            if isinstance(player.target, Asteroid) :
+            if isinstance(game.player.target, Asteroid) :
                 self._target_picture.texture = self._target_picture_asteroid
-            elif isinstance(player.target, Planet) :
+            elif isinstance(game.player.target, Planet) :
                 self._target_picture.texture = self._target_picture_planet
-            elif isinstance(player.target, Ship) :
+            elif isinstance(game.player.target, Ship) :
                 self._target_picture.texture = self._target_picture_ship
             else :
                 self._target_picture.texture = self._target_picture_empty
             
-            direction = soy.atoms.Vector(player.target.body.position - player.cam.position)
+            direction = soy.atoms.Vector(game.player.target.body.position - game.player.cam.position)
             distance = direction.magnitude()
-            rot = player.rot.conjugate()
+            rot = game.player.rot.conjugate()
             direction = rot.rotate(direction)
             
             aspect = self.size[0] / self.size[1]
@@ -137,7 +146,7 @@ class HUD(soy.widgets.Container) :
             self._distance_text_tex.source = self._stats_text_svg.format('{0:.1f}'.format(distance))
 
             if direction[2] < 0 :
-                res = player.cam.project(soy.atoms.Vector(direction), aspect)
+                res = game.player.cam.project(soy.atoms.Vector(direction), aspect)
                 if math.fabs(res[0]) < 1 and math.fabs(res[1]) < 1 :
                     self._target_circle.scaleX = 0.1
                     self._target_circle.scaleY = 0.1
@@ -145,7 +154,7 @@ class HUD(soy.widgets.Container) :
                     self._target_arrow.scaleY = 0
                     self._target_circle.x = res[0] * aspect
                     self._target_circle.y = res[1]
-                    scale = -4 * player.target.size / direction[2]
+                    scale = -4 * game.player.target.size / direction[2]
                     self._target_circle.scaleX = scale
                     self._target_circle.scaleY = scale
                     onscreen = True
@@ -172,24 +181,24 @@ class HUD(soy.widgets.Container) :
                 self._target_arrow.scaleX = 0.1
                 self._target_arrow.scaleY = 0.1
         self._target_text_tex.source = self._target_text_svg.format(target_name)
-        self._score_text_tex.source = self._stats_text_svg.format('{0}'.format(player.score))
+        self._score_text_tex.source = self._stats_text_svg.format('{0}'.format(game.player.score))
+        self._speed_text_tex.source = self._stats_text_svg.format('{0:.1f}'.format(abs(game.player.speed.current)))
         
-        time = player.maxtime - time
-        
-        minutes = math.floor(time / 60)
-        seconds = math.floor(math.fmod(time, 60))
+        minutes = math.floor(game.player.time / 60)
+        seconds = math.floor(math.fmod(game.player.time, 60))
         
         self._time_text_tex.source = self._stats_text_svg.format('{0}:{1:02d}'.format(minutes, seconds))
-        self._stats_bar_tex.source = self._stats_bar_svg.format(975.05469 * player.health / player.max_health, 975.05469 * player.shield / player.max_shield)
+        self._stats_bar_tex.source = self._stats_bar_svg.format(975.05469 * game.player.health / game.player.max_health, 975.05469 * game.player.shield / game.player.max_shield)
 
 
 class SpaceObject :
-    def __init__(self, body, name, position, size, scene, health, shield) :
+    def __init__(self, body, name, position, size, scene, health, shield, target = False) :
         self.body = body
         self.name = name
         self.size = size
         self.health = health
         self.shield = shield
+        self.target = target
         body.position = position
         scene[name] = body
     def collides(self, other) :
@@ -203,6 +212,10 @@ class Planet(SpaceObject) :
         self.body.material = soy.materials.Textured(colormap=self.texture)
         self.body.radius = size
 
+    def collidePlayer(self, game) :
+        game.player.shield = 0
+        game.player.health = 0
+
 class Ship(SpaceObject) :
     def __init__(self, name, model, size, position, scene) :
         super().__init__(Model(model), name, position, size, scene, 100, 100)
@@ -210,11 +223,80 @@ class Ship(SpaceObject) :
 class Asteroid(SpaceObject) :
     model = None
     
-    def __init__(self, name, model, size, position, scene) :
+    def __init__(self, name, model, position, scene) :
         if Asteroid.model is None :
             Asteroid.model = Model(model)
         
-        super().__init__(copy.deepcopy(Asteroid.model), name, position, size, scene, 30, 0)
+        super().__init__(copy.deepcopy(Asteroid.model), name, position, 1.5, scene, 30, 0, True)
+
+    def collidePlayer(self, game) :
+        if game.player.shield > 0 :
+            game.player.shield -= 10
+            if game.player.shield < 0 :
+                game.player.shield = 0
+        else :
+            game.player.health -= 10
+        
+        game.remove(self)
+
+class TimeUp(SpaceObject) :
+    model = None
+    
+    def __init__(self, name, model, position, scene) :
+        if TimeUp.model is None :
+            TimeUp.model = Model(model)
+        
+        super().__init__(copy.deepcopy(TimeUp.model), name, position, 1, scene, 0, 0)
+        
+    def collidePlayer(self, game) :
+        game.player.time += 10
+        game.remove(self)
+
+class SpeedUp(SpaceObject) :
+    model = None
+    
+    def __init__(self, name, model, position, scene) :
+        if SpeedUp.model is None :
+            SpeedUp.model = Model(model)
+        
+        super().__init__(copy.deepcopy(SpeedUp.model), name, position, 1, scene, 0, 0)
+
+    def collidePlayer(self, game) :
+        game.player.boost()
+        game.remove(self)
+
+class HealthUp(SpaceObject) :
+    model = None
+    
+    def __init__(self, name, model, position, scene) :
+        if HealthUp.model is None :
+            HealthUp.model = Model(model)
+        
+        super().__init__(copy.deepcopy(HealthUp.model), name, position, 1, scene, 0, 0)
+
+    def collidePlayer(self, game) :
+        game.player.health += 10
+        if game.player.health > game.player.max_health :
+            game.player.health = game.player.max_health
+        game.remove(self)
+
+class Bomb(SpaceObject) :
+    model = None
+    
+    def __init__(self, name, model, position, scene) :
+        if Bomb.model is None :
+            Bomb.model = Model(model)
+        
+        super().__init__(copy.deepcopy(Bomb.model), name, position, 1, scene, 0, 0)
+
+    def collidePlayer(self, game) :
+        if game.player.shield > 0 :
+            game.player.shield -= 10
+            if game.player.shield <= 0 :
+                game.player.shield = 0
+        else :
+            game.player.health -= 10
+        game.remove(self)
 
 class Shot(SpaceObject) :
     def __init__(self, position, number, birth, rotation, scene) :
@@ -227,13 +309,51 @@ class Shot(SpaceObject) :
         self.birth = birth
         self.damage = 10
 
+class Speed :
+    def __init__(self, max, accel, decel) :
+        self.max = max
+        self.original = max
+        self.duration = 0
+        self.accel = accel
+        self.decel = decel
+        self.current = 0
+    
+    def update(self, to, dt) :
+        to *= self.max
+        
+        mag = abs(to)
+        magc = abs(self.current)
+        diff = to - self.current
+        magd = abs(diff)
+        
+        acc = self.accel * dt
+        
+        if magc > mag or to * self.current < 0 :
+            acc = self.decel * dt
+        
+        if magd < acc :
+            acc = diff
+        else :
+            acc = math.copysign(acc, diff)
+        
+        self.current += acc
+        
+        self.duration -= dt
+        if self.duration <= 0 :
+            self.max = self.original
+        
+        return self.current * dt
+    
+    def boost(self, duration, speed) :
+        self.max = speed
+        self.duration = duration
+
 class Player(SpaceObject) :
     def __init__(self, scene) :
         position = soy.atoms.Position((0,0,10))
         self.cam = soy.bodies.Camera(position)
         super().__init__(self.cam, 'cam', position, 3, scene, 100, 100)
         self.rot = self.cam.rotation
-        self.shots = []
         self.last_shot = time.time()
         self.controller = sdl2.SDL_GameControllerOpen(0)
         self.target_clicked = False
@@ -242,7 +362,15 @@ class Player(SpaceObject) :
         self.max_health = 100
         self.max_shield = 100
         self.score = 0
-        self.maxtime = 300
+        self.time = 120
+        self.speed = Speed(50, 10, 20)
+        self.strafe = Speed(20, 5, 10)
+        self.rotate1 = Speed(1, 4, 4)
+        self.rotate2 = Speed(1, 4, 4)
+        
+    def boost(self) :
+        self.speed.boost(5, 80)
+        self.strafe.boost(5, 30)
         
     def select_target(self, objects) :
         if len(objects) == 0 :
@@ -253,7 +381,7 @@ class Player(SpaceObject) :
         prev = self.target
         
         for i, t in enumerate(objects) :
-            if t == prev :
+            if t == prev or not t.target :
                 continue
             
             direction = soy.atoms.Vector(t.body.position - self.cam.position)
@@ -266,20 +394,17 @@ class Player(SpaceObject) :
                 self.target = t
                 best = weighted
         
-    def update(self, runtime, dt, scene, objects, free_asteroids) :
-        speed = 50
-        strafe = 20
-        
+    def update(self, dt, game) :
         axis1 = sdl2.SDL_GameControllerGetAxis(self.controller, 0) / 32768
         axis2 = sdl2.SDL_GameControllerGetAxis(self.controller, 1) / 32768
         axis3 = sdl2.SDL_GameControllerGetAxis(self.controller, 2) / 32768
         axis4 = sdl2.SDL_GameControllerGetAxis(self.controller, 3) / 32768
         
-        self.rot *= soy.atoms.Rotation((0, 1, 0), -axis3 * dt)
-        self.rot *= soy.atoms.Rotation((1, 0, 0), -axis4 * dt)
+        self.rot *= soy.atoms.Rotation((0, 1, 0), -self.rotate1.update(axis3, dt))
+        self.rot *= soy.atoms.Rotation((1, 0, 0), -self.rotate2.update(axis4, dt))
 
-        mov = soy.atoms.Position(self.rot.rotate(soy.atoms.Vector((0, 0, 1)) * dt * speed * axis2))
-        mov += soy.atoms.Position(self.rot.rotate(soy.atoms.Vector((1, 0, 0)) * dt * strafe * axis1))
+        mov = soy.atoms.Position(self.rot.rotate(soy.atoms.Vector((0, 0, 1)) * self.speed.update(axis2, dt)))
+        mov += soy.atoms.Position(self.rot.rotate(soy.atoms.Vector((1, 0, 0)) * self.strafe.update(axis1, dt)))
 
         self.cam.position += mov
         self.cam.rotation = self.rot
@@ -289,154 +414,180 @@ class Player(SpaceObject) :
         sdl2.SDL_GameControllerUpdate()
         
         if self.last_shot + 0.1 < current and sdl2.SDL_GameControllerGetButton(self.controller, 10) :
-            shot = Shot(self.cam.position, self.fired, current, self.rot, scene)
+            shot = Shot(self.cam.position, self.fired, current, self.rot, game.scene)
             self.fired += 1
-            self.shots.append(shot)
+            game.shots.append(shot)
             self.last_shot = current
         
         if sdl2.SDL_GameControllerGetButton(self.controller, 9) != self.target_clicked :
             self.target_clicked = not self.target_clicked
             if self.target_clicked :
-                self.select_target(objects)
+                self.select_target(game.objects)
             
-        for shot in self.shots :
-            hit = False
-            
-            for obj in objects :
-                if obj.collides(shot) :
-                    hit = True
-                    if obj.shield > 0 :
-                        obj.shield -= shot.damage
-                        if obj.shield < 0 :
-                            obj.shield = 0
-                    else :
-                        obj.health -= shot.damage
-                        if obj.health <= 0 :
-                            self.score += 1
-                            free_asteroids.append(obj.name)
-                            del scene[obj.name]
-                            objects.remove(obj)
-                            if self.target == obj :
-                                self.select_target(objects)
-            
-            if current - shot.birth > 10 or hit :
-                self.shots.remove(shot)
-                del scene['shot%d' % shot.number]
-
-        for obj in objects :
-            if obj.collides(self) :
-                if self.shield > 0 :
-                    self.shield -= 10
-                    if self.shield < 0 :
-                        self.shield = 0
-                else :
-                    self.health -= 10
-                    
-                if self.health <= 0 :
-                    quit()
-
-                free_asteroids.append(obj.name)
-                del scene[obj.name]
-                objects.remove(obj)
+        self.time -= dt
         
-        if runtime > self.maxtime :
+        if self.time <= 0 :
             quit()
 
-sdl2.SDL_InitSubSystem(sdl2.SDL_INIT_GAMECONTROLLER)
-sdl2.SDL_GameControllerEventState(sdl2.SDL_IGNORE)
-sdl2.SDL_GameControllerAddMapping(b'030000006d04000018c2000010010000,Logitech Logitech RumblePad 2 USB,platform:Linux,x:b0,a:b1,b:b2,y:b3,back:b8,start:b9,dpleft:h0.8,dpdown:h0.4,dpright:h0.2,dpup:h0.1,leftshoulder:b4,lefttrigger:b6,rightshoulder:b5,righttrigger:b7,leftstick:b10,rightstick:b11,leftx:a0,lefty:a1,rightx:a2,righty:a3,')
+class Game :
+    def __init__(self) :
+        self.client = soy.Client()
+        self.scale = 500
 
-if not sdl2.SDL_IsGameController(0) :
-    print('No game controller found!')
-    sys.exit(1)
+        self.scene = soy.scenes.Space(2 ** 24, self.scale)
+        self.player = Player(self.scene)
 
-scale = 500
+        self.client.window.append(soy.widgets.Projector(self.player.cam))
 
-client = soy.Client()
-scene = soy.scenes.Space(2 ** 24, scale)
-player = Player(scene)
-client.window.append(soy.widgets.Projector(player.cam))
+        self.hud = HUD()
+        self.client.window.append(self.hud)
 
-hud = HUD()
-client.window.append(hud)
+        background = soy.textures.Cubemap()
+        background.front = soy.textures.Texture('textures/front.png')
+        background.back = soy.textures.Texture('textures/back.png')
+        background.up = soy.textures.Texture('textures/top.png')
+        background.down = soy.textures.Texture('textures/bottom.png')
+        background.left = soy.textures.Texture('textures/left.png')
+        background.right = soy.textures.Texture('textures/right.png')
+        self.scene.skybox = background
 
-background = soy.textures.Cubemap()
-background.front = soy.textures.Texture('textures/front.png')
-background.back = soy.textures.Texture('textures/back.png')
-background.up = soy.textures.Texture('textures/top.png')
-background.down = soy.textures.Texture('textures/bottom.png')
-background.left = soy.textures.Texture('textures/left.png')
-background.right = soy.textures.Texture('textures/right.png')
-scene.skybox = background
+        self.objects = []
+        self.free_asteroids = []
+        self.shots = []
+        self.pup = 0
+        
+        for i in range(100) :
+            self.createAsteroid('Asteroid {0}'.format(i))
 
-objects = []
+        #ship = Ship('Enemy Ship', 'models/main_ship.obj', 3.5, soy.atoms.Position((0, 0, 0)), scene)
+        self.earth = Planet('Earth', 'textures/earthmap1k.jpg', 50000, soy.atoms.Position((0, 0, -60000)), self.scene)
+        self.scene.setDistance('Earth', 100000)
 
-#ship = Ship('Enemy Ship', 'models/main_ship.obj', 3.5, soy.atoms.Position((0, 0, 0)), scene)
-earth = Planet('Earth', 'textures/earthmap1k.jpg', 50000, soy.atoms.Position((0, 0, -60000)), scene)
-scene.setDistance('Earth', 100000)
+        self.earth.body.addTorque(3000,3000,500)
 
-earth.body.addTorque(3000,3000,500)
+        #objects.append(ship)
+        #objects.append(earth)
 
-#objects.append(ship)
-#objects.append(earth)
+        #venus = Planet('venus', 'textures/venusmap.png', 2, soy.atoms.Position((0, 0, -50)), scene)
+        #mercury = Planet('mercury', 'textures/mercurymap.png', 1, soy.atoms.Position((0, 0, -100)), scene)
+        #mars = Planet('mars', 'textures/mars_1k_color.png', 2, soy.atoms.Position((0, 0, 50)), scene)
+        #jupiter = Planet('jupiter', 'textures/jupitermap.png', 10, soy.atoms.Position((0, 0, 100)), scene)
+        #saturn = Planet('saturn', 'textures/saturnmap.png', 9, soy.atoms.Position((0, 0, 150)), scene)
+        #uranus = Planet('uranus', 'textures/uranusmap.png', 7, soy.atoms.Position((0, 0, 200)), scene)
+        #neptune = Planet('neptune', 'textures/neptunemap.png', 7, soy.atoms.Position((0, 0, 250)), scene)
 
-def createAsteroid(name) :
-    pos = []
-    rot = []
-    for j in range(3) :
-        pos.append((random.random() * 3 - 1) * scale)
-        rot.append((random.random() * 2 - 1) * 10)
-    asteroid = Asteroid(name, 'models/asteroid.obj', 1.5, soy.atoms.Position(pos), scene)
-    asteroid.body.addTorque(rot[0], rot[1], rot[2])
-    objects.append(asteroid)
-    scene.setKeep(name, False)
-    scene.setDistance(name, scale * 2)
+    def createAsteroid(self, name) :
+        pos = []
+        rot = []
+        for j in range(3) :
+            pos.append((random.random() * 3 - 1) * self.scale)
+            rot.append((random.random() * 2 - 1) * 10)
+        asteroid = Asteroid(name, 'models/asteroid.obj', soy.atoms.Position(pos), self.scene)
+        asteroid.body.addTorque(rot[0], rot[1], rot[2])
+        self.objects.append(asteroid)
+        self.scene.setKeep(name, False)
+        self.scene.setDistance(name, self.scale * 2)
+        
+    def createPowerUp(self, position) :
+        name = 'Power Up {0}'.format(self.pup)
+        pup = None
+        
+        prob = random.random()
+        
+        if prob < 0.3 :
+            pup = TimeUp(name, 'models/time.obj', position, self.scene)
+        elif prob < 0.6 :
+            pup = SpeedUp(name, 'models/speed.obj', position, self.scene)
+        else :
+            return
+        
+        self.pup += 1
+        self.objects.append(pup)
+        self.scene.setKeep(name, False)
+        self.scene.setDistance(name, self.scale * 2)
+        
+    def remove(self, obj) :
+        if obj.name.startswith('Asteroid') :
+            self.free_asteroids.append(obj.name)
 
-for i in range(100) :
-    createAsteroid('Asteroid {0}'.format(i))
+        del self.scene[obj.name]
+        self.objects.remove(obj)
 
-free_asteroids = []
+        if self.player.target == obj :
+            self.player.select_target(self.objects)
+        
+    def run(self) :
+        start = time.time()
+        last = start
 
-#venus = Planet('venus', 'textures/venusmap.png', 2, soy.atoms.Position((0, 0, -50)), scene)
-#mercury = Planet('mercury', 'textures/mercurymap.png', 1, soy.atoms.Position((0, 0, -100)), scene)
-#mars = Planet('mars', 'textures/mars_1k_color.png', 2, soy.atoms.Position((0, 0, 50)), scene)
-#jupiter = Planet('jupiter', 'textures/jupitermap.png', 10, soy.atoms.Position((0, 0, 100)), scene)
-#saturn = Planet('saturn', 'textures/saturnmap.png', 9, soy.atoms.Position((0, 0, 150)), scene)
-#uranus = Planet('uranus', 'textures/uranusmap.png', 7, soy.atoms.Position((0, 0, 200)), scene)
-#neptune = Planet('neptune', 'textures/neptunemap.png', 7, soy.atoms.Position((0, 0, 250)), scene)
+        #__import__("code").interact(local=locals())
 
-start = time.time()
-last = start
+        while self.client.window :
 
-#__import__("code").interact(local=locals())
+            current = time.time()
+            dt = current - last
+            last = current
+            
+            self.player.update(dt, game)
+            
+            for shot in self.shots :
+                hit = False
+                
+                for obj in self.objects :
+                    if obj.target and obj.collides(shot) :
+                        hit = True
+                        if obj.shield > 0 :
+                            obj.shield -= shot.damage
+                            if obj.shield < 0 :
+                                obj.shield = 0
+                        else :
+                            obj.health -= shot.damage
+                            if obj.health <= 0 :
+                                self.createPowerUp(obj.body.position)
+                                self.player.score += 1
+                                self.remove(obj)
+                
+                if current - shot.birth > 10 or hit :
+                    self.shots.remove(shot)
+                    del self.scene['shot%d' % shot.number]
 
+            for obj in self.objects :
+                if obj.collides(self.player) :
+                    obj.collidePlayer(self)
+        
+            if self.player.health <= 0 or self.player.time <= 0 :
+                break
+                
+            self.hud.update(self)
+            
+            rem = self.scene.pollRemoved()
+            for name in rem :
+                for i, t in enumerate(self.objects) :
+                    if t.name == name :
+                        del self.objects[i]
+                if name.startswith('Asteroid') :
+                    self.free_asteroids.append(name)
+                
+            transitions = self.scene.pollCells()
+            if len(transitions) > 0 :
+                for name in self.free_asteroids :
+                    self.createAsteroid(name)
+                self.free_asteroids.clear()
+
+            time.sleep(.01)
+        
 if __name__ == '__main__' :
-    while client.window :
+    sdl2.SDL_InitSubSystem(sdl2.SDL_INIT_GAMECONTROLLER)
+    sdl2.SDL_GameControllerEventState(sdl2.SDL_IGNORE)
+    sdl2.SDL_GameControllerAddMapping(b'030000006d04000018c2000010010000,Logitech Logitech RumblePad 2 USB,platform:Linux,x:b0,a:b1,b:b2,y:b3,back:b8,start:b9,dpleft:h0.8,dpdown:h0.4,dpright:h0.2,dpup:h0.1,leftshoulder:b4,lefttrigger:b6,rightshoulder:b5,righttrigger:b7,leftstick:b10,rightstick:b11,leftx:a0,lefty:a1,rightx:a2,righty:a3,')
 
-        current = time.time()
-        dt = current - last
-        last = current
-        
-        player.update(current - start, dt, scene, objects, free_asteroids)
-        
-        hud.update(player, objects, current - start)
-        
-        rem = scene.pollRemoved()
-        for name in rem :
-            for i, t in enumerate(objects) :
-                if t.name == name :
-                    del objects[i]
-        free_asteroids.extend(rem)
-            
-        transitions = scene.pollCells()
-        if len(transitions) > 0 :
-            for name in free_asteroids :
-                createAsteroid(name)
-            free_asteroids.clear()
-            
+    if not sdl2.SDL_IsGameController(0) :
+        print('No game controller found!')
+        sys.exit(1)
 
-        time.sleep(.01)
+    game = Game()
 
+    game.run()
 
-sdl2.SDL_GameControllerClose(player.controller)
-sdl2.SDL_QuitSubSystem(sdl2.SDL_INIT_GAMECONTROLLER)
+    sdl2.SDL_GameControllerClose(game.player.controller)
+    sdl2.SDL_QuitSubSystem(sdl2.SDL_INIT_GAMECONTROLLER)
