@@ -168,9 +168,9 @@ class Model(soy.bodies.Mesh) :
         splitter = re.compile(r'(\S+)')
         
         name = None
-        bumpmap = None
-        colormap = None
-        glowmap = None
+        bumpmap = soy.textures.Texture()
+        colormap = soy.textures.Texture()
+        glowmap = soy.textures.Texture()
         ambient = None
         diffuse = None
         specular = None
@@ -195,7 +195,7 @@ class Model(soy.bodies.Mesh) :
                 if len(fields) != 2 :
                     continue
                 if name != None:
-                    materials[name] = soy.materials.Textured(name = name, colormap = colormap, bumpmap = bumpmap, glowmap = glowmap)
+                    materials[name] = soy.materials.Textured(name = name, bumpmap = bumpmap, colormap = colormap, glowmap = glowmap)
                     if ambient is not None :
                         materials[name].ambient = ambient
                     if diffuse is not None :
@@ -205,9 +205,9 @@ class Model(soy.bodies.Mesh) :
                     if shininess is not None :
                         materials[name].shininess = shininess
                 name = fields[1]
-                bumpmap = None
-                colormap = None
-                glowmap = None
+                bumpmap = soy.textures.Texture()
+                colormap = soy.textures.Texture()
+                glowmap = soy.textures.Texture()
                 ambient = None
                 diffuse = None
                 specular = None
@@ -219,7 +219,7 @@ class Model(soy.bodies.Mesh) :
                     base = os.path.split(filename)
                     fields[1] = os.path.join(base[0], fields[1])
                 colormap = soy.textures.Texture(fields[1])
-            elif fields[0] == 'map_bump' or fields[0] == 'bump' :
+            elif fields[0].lower() == 'map_bump' or fields[0].lower() == 'bump' :
                 if len(fields) != 2 :
                     continue
                 if not os.path.isabs(fields[1]) :
