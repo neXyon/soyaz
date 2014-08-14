@@ -275,9 +275,14 @@ class HealthUp(SpaceObject) :
         super().__init__(copy.deepcopy(HealthUp.model), name, position, 1, scene, 0, 0)
 
     def collidePlayer(self, game) :
-        game.player.health += 10
-        if game.player.health > game.player.max_health :
-            game.player.health = game.player.max_health
+        if game.player.health == game.player.max_health :
+            game.player.shield += 10
+            if game.player.shield > game.player.max_shield :
+                game.player.shield = game.player.max_shield
+        else :
+            game.player.health += 10
+            if game.player.health > game.player.max_health :
+                game.player.health = game.player.max_health
         game.remove(self)
 
 class Bomb(SpaceObject) :
@@ -291,11 +296,11 @@ class Bomb(SpaceObject) :
 
     def collidePlayer(self, game) :
         if game.player.shield > 0 :
-            game.player.shield -= 10
+            game.player.shield -= 30
             if game.player.shield <= 0 :
                 game.player.shield = 0
         else :
-            game.player.health -= 10
+            game.player.health -= 30
         game.remove(self)
 
 class Shot(SpaceObject) :
@@ -494,10 +499,14 @@ class Game :
         
         prob = random.random()
         
-        if prob < 0.3 :
+        if prob < 0.25 :
             pup = TimeUp(name, 'models/time.obj', position, self.scene)
-        elif prob < 0.6 :
+        elif prob < 0.5 :
             pup = SpeedUp(name, 'models/speed.obj', position, self.scene)
+        elif prob < 0.75 :
+            pup = HealthUp(name, 'models/health.obj', position, self.scene)
+        elif prob < 1.0 :
+            pup = Bomb(name, 'models/bomb.obj', position, self.scene)
         else :
             return
         
