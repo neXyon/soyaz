@@ -100,6 +100,15 @@ class HUD(soy.widgets.Container) :
         self._speed_text.align = 0
         self._speed_text.x = 0.1
         self._speed_text.y = -0.08
+        with open("hud/highscore.svg", "r") as file:
+            self._highscore_svg = file.read()
+        self._highscore_tex = soy.textures.SVGTexture()
+        self._highscore = soy.widgets.Canvas(self._highscore_tex)
+        self._highscore.keep_aspect = True
+        self._highscore.scaleX = 0.5
+        self._highscore.scaleY = 0.5
+        self._highscore.align = 1
+        self._highscore.x = -0.02
         
         self.append(self._crosshair)
         self.append(self._distance_text)
@@ -113,6 +122,22 @@ class HUD(soy.widgets.Container) :
         self.append(self._target_circle)
         self.append(self._score_text)
         self.append(self._time_text)
+        self.append(self._highscore)
+        
+    def updateHighScore(self, game) :
+        if game.menu :
+            self._highscore.scaleY = 0.5
+            
+            hs = []
+            i = 1
+            
+            for score in game.highscores :
+                hs.append('{0}. {1}'.format(i, score))
+                i += 1
+            
+            self._highscore_tex.source = self._highscore_svg.format('\n'.join(hs))
+        else :
+            self._highscore.scaleY = 0
         
     def update(self, game) :
         target_name = ""
@@ -130,7 +155,7 @@ class HUD(soy.widgets.Container) :
                 self._target_picture.texture = self._target_picture_asteroid
             elif isinstance(game.player.target, Planet) :
                 self._target_picture.texture = self._target_picture_planet
-            elif isinstance(game.player.target, Ship) :
+            elif isinstance(game.player.target, Ship) or isinstance(game.player.target, JumpGate) :
                 self._target_picture.texture = self._target_picture_ship
             else :
                 self._target_picture.texture = self._target_picture_empty
@@ -192,33 +217,36 @@ class HUD(soy.widgets.Container) :
 
 
 class SpaceObject :
-    def __init__(self, body, name, position, size, scene, health, shield, target = False) :
+    def __init__(self, body, name, position, size, scene, health, shield, keep, target = False) :
         self.body = body
         self.name = name
         self.size = size
         self.health = health
         self.shield = shield
         self.target = target
-        body.position = position
+        self.keep = keep
+        #body.position = position
         scene[name] = body
-    def collides(self, other) :
-        distance = self.body.position - other.body.position
+        body.position = position
+        
+    def collides(self, scene, other) :
+        distance = soy.atoms.Vector(scene.getPosition(self.name)) - soy.atoms.Vector(scene.getPosition(other.name))
         return distance.x * distance.x + distance.y * distance.y + distance.z * distance.z < (self.size + other.size) * (self.size + other.size)
 
 class Planet(SpaceObject) :
     def __init__(self, name, texture, size, position, scene) :
-        super().__init__(soy.bodies.Sphere(), name, position, size, scene, 1000000, 0)
+        super().__init__(soy.bodies.Sphere(), name, position, size, scene, 1000000, 0, True, True)
         self.texture = soy.textures.Texture(texture)
         self.body.material = soy.materials.Textured(colormap=self.texture)
         self.body.radius = size
 
     def collidePlayer(self, game) :
-        game.player.shield = 0
-        game.player.health = 0
+        print('Thanks for playing, bye!')
+        game.quit = True
 
 class Ship(SpaceObject) :
     def __init__(self, name, model, size, position, scene) :
-        super().__init__(Model(model), name, position, size, scene, 100, 100)
+        super().__init__(Model(model), name, position, size, scene, 100, 100, True, False)
 
 class Asteroid(SpaceObject) :
     model = None
@@ -227,7 +255,7 @@ class Asteroid(SpaceObject) :
         if Asteroid.model is None :
             Asteroid.model = Model(model)
         
-        super().__init__(copy.deepcopy(Asteroid.model), name, position, 1.5, scene, 30, 0, True)
+        super().__init__(copy.deepcopy(Asteroid.model), name, position, 1.5, scene, 30, 0, False, True)
 
     def collidePlayer(self, game) :
         if game.player.shield > 0 :
@@ -246,10 +274,11 @@ class TimeUp(SpaceObject) :
         if TimeUp.model is None :
             TimeUp.model = Model(model)
         
-        super().__init__(copy.deepcopy(TimeUp.model), name, position, 1, scene, 0, 0)
+        super().__init__(copy.deepcopy(TimeUp.model), name, position, 1, scene, 0, 0, False)
         
     def collidePlayer(self, game) :
         game.player.time += 10
+        game.player.score += 17
         game.remove(self)
 
 class SpeedUp(SpaceObject) :
@@ -259,10 +288,11 @@ class SpeedUp(SpaceObject) :
         if SpeedUp.model is None :
             SpeedUp.model = Model(model)
         
-        super().__init__(copy.deepcopy(SpeedUp.model), name, position, 1, scene, 0, 0)
+        super().__init__(copy.deepcopy(SpeedUp.model), name, position, 1, scene, 0, 0, False)
 
     def collidePlayer(self, game) :
         game.player.boost()
+        game.player.score += 27
         game.remove(self)
 
 class HealthUp(SpaceObject) :
@@ -272,7 +302,7 @@ class HealthUp(SpaceObject) :
         if HealthUp.model is None :
             HealthUp.model = Model(model)
         
-        super().__init__(copy.deepcopy(HealthUp.model), name, position, 1, scene, 0, 0)
+        super().__init__(copy.deepcopy(HealthUp.model), name, position, 1, scene, 0, 0, False)
 
     def collidePlayer(self, game) :
         if game.player.health == game.player.max_health :
@@ -283,6 +313,7 @@ class HealthUp(SpaceObject) :
             game.player.health += 10
             if game.player.health > game.player.max_health :
                 game.player.health = game.player.max_health
+        game.player.score += 123
         game.remove(self)
 
 class Bomb(SpaceObject) :
@@ -292,7 +323,7 @@ class Bomb(SpaceObject) :
         if Bomb.model is None :
             Bomb.model = Model(model)
         
-        super().__init__(copy.deepcopy(Bomb.model), name, position, 1, scene, 0, 0)
+        super().__init__(copy.deepcopy(Bomb.model), name, position, 1, scene, 0, 0, False)
 
     def collidePlayer(self, game) :
         if game.player.shield > 0 :
@@ -301,18 +332,34 @@ class Bomb(SpaceObject) :
                 game.player.shield = 0
         else :
             game.player.health -= 30
+        game.player.score -= 11
         game.remove(self)
 
 class Shot(SpaceObject) :
     def __init__(self, position, number, birth, rotation, scene) :
         body = soy.bodies.Billboard(position, size=soy.atoms.Size((.5,.5)),material=soy.materials.Textured(colormap = soy.textures.Texture('textures/shot.png')))
         name = 'shot{0}'.format(number)
-        super().__init__(body, name, position, 0, scene, 0, 0)
+        super().__init__(body, name, position, 0, scene, 0, 0, False)
         self.body.rotation = rotation
         self.body.addRelForce(0, 0, -5000)
         self.number = number
         self.birth = birth
         self.damage = 10
+
+class JumpGate(SpaceObject) :
+    model = None
+
+    def __init__(self, name, model, position, scene) :
+        if JumpGate.model is None :
+            JumpGate.model = Model(model)
+
+        super().__init__(copy.deepcopy(JumpGate.model), name, position, 2, scene, 1000000, 0, True, True)
+
+    def collidePlayer(self, game) :
+        if game.menu :
+            game.start()
+        else :
+            game.stop(True)
 
 class Speed :
     def __init__(self, max, accel, decel) :
@@ -355,9 +402,9 @@ class Speed :
 
 class Player(SpaceObject) :
     def __init__(self, scene) :
-        position = soy.atoms.Position((0,0,10))
+        position = soy.atoms.Position((0,0,0))
         self.cam = soy.bodies.Camera(position)
-        super().__init__(self.cam, 'cam', position, 3, scene, 100, 100)
+        super().__init__(self.cam, 'cam', position, 3, scene, 100, 100, True)
         self.rot = self.cam.rotation
         self.last_shot = time.time()
         self.controller = sdl2.SDL_GameControllerOpen(0)
@@ -367,7 +414,8 @@ class Player(SpaceObject) :
         self.max_health = 100
         self.max_shield = 100
         self.score = 0
-        self.time = 120
+        self.start_time = 60#120
+        self.time = self.start_time
         self.speed = Speed(50, 10, 20)
         self.strafe = Speed(20, 5, 10)
         self.rotate1 = Speed(1, 4, 4)
@@ -429,15 +477,22 @@ class Player(SpaceObject) :
             if self.target_clicked :
                 self.select_target(game.objects)
             
-        self.time -= dt
+        if not game.menu :
+            self.time -= dt
         
-        if self.time <= 0 :
-            quit()
-
 class Game :
     def __init__(self) :
         self.client = soy.Client()
         self.scale = 500
+        
+        self.objects = []
+        self.free_asteroids = []
+        self.shots = []
+        self.pup = 0
+        self.quit = False
+        self.menu = True
+        
+        self.readHighScore()
 
         self.scene = soy.scenes.Space(2 ** 24, self.scale)
         self.player = Player(self.scene)
@@ -445,6 +500,7 @@ class Game :
         self.client.window.append(soy.widgets.Projector(self.player.cam))
 
         self.hud = HUD()
+        self.hud.updateHighScore(self)
         self.client.window.append(self.hud)
 
         background = soy.textures.Cubemap()
@@ -456,22 +512,21 @@ class Game :
         background.right = soy.textures.Texture('textures/right.png')
         self.scene.skybox = background
 
-        self.objects = []
-        self.free_asteroids = []
-        self.shots = []
-        self.pup = 0
-        
-        for i in range(100) :
-            self.createAsteroid('Asteroid {0}'.format(i))
-
-        #ship = Ship('Enemy Ship', 'models/main_ship.obj', 3.5, soy.atoms.Position((0, 0, 0)), scene)
-        self.earth = Planet('Earth', 'textures/earthmap1k.jpg', 50000, soy.atoms.Position((0, 0, -60000)), self.scene)
+        #self.ship = Ship('Enemy Ship', 'models/main_ship.obj', 3.5, soy.atoms.Position((0, 0, 0)), self.scene)
+        self.earth = Planet('Earth', 'textures/earthmap1k.jpg', 50000, soy.atoms.Position((0, 0, -50100)), self.scene)
         self.scene.setDistance('Earth', 100000)
-
         self.earth.body.addTorque(3000,3000,500)
 
-        #objects.append(ship)
-        #objects.append(earth)
+        self.jumpgate1 = JumpGate('Earth Jump Gate', 'models/jumpgate.obj', soy.atoms.Position((0, 0, 100)), self.scene)
+        self.jumpgate1.body.addTorque(30,30,30)
+
+        self.jumpgate2 = JumpGate('Asteroid Field Jump Gate', 'models/jumpgate.obj', soy.atoms.Position((0, 0, 50100)), self.scene)
+        self.jumpgate2.body.addTorque(30,30,30)
+
+        #self.objects.append(self.ship)
+        self.objects.append(self.jumpgate1)
+        self.objects.append(self.jumpgate2)
+        self.objects.append(self.earth)
 
         #venus = Planet('venus', 'textures/venusmap.png', 2, soy.atoms.Position((0, 0, -50)), scene)
         #mercury = Planet('mercury', 'textures/mercurymap.png', 1, soy.atoms.Position((0, 0, -100)), scene)
@@ -480,6 +535,88 @@ class Game :
         #saturn = Planet('saturn', 'textures/saturnmap.png', 9, soy.atoms.Position((0, 0, 150)), scene)
         #uranus = Planet('uranus', 'textures/uranusmap.png', 7, soy.atoms.Position((0, 0, 200)), scene)
         #neptune = Planet('neptune', 'textures/neptunemap.png', 7, soy.atoms.Position((0, 0, 250)), scene)
+
+    def readHighScore(self) :
+        filename = os.path.expanduser('~/soyaz.score')
+        
+        try :
+            data = open(filename)
+            lines = data.readlines()
+            data.close()
+            
+            hs = []
+            
+            for line in lines :
+                hs.append(int(line))
+            
+            hs.sort(reverse = True)
+            
+            self.highscores = hs
+        except :
+            self.highscores = []
+
+    def saveHighScores(self) :
+        filename = os.path.expanduser('~/soyaz.score')
+
+        self.highscores.sort(reverse = True)
+        self.highscores = self.highscores[0:10]
+
+        lines = []
+        for hs in self.highscores :
+            lines.append(str(hs) + '\n')
+
+        try :
+            data = open(filename, 'w')
+            data.writelines(lines)
+            data.close()
+        except :
+            pass
+
+    def start(self) :
+        if self.menu :
+            self.menu = False
+            #self.client.window.append(self.hud)
+            self.hud.updateHighScore(self)
+            goto = soy.atoms.Vector(self.scene.getPosition(self.jumpgate2.name))
+            #goto = goto - soy.atoms.Vector(self.scene.getPosition(self.player.name))
+            self.scene.setPosition(self.player.name, goto[0], goto[1], goto[2] - 100)
+            time.sleep(0.1)
+            if len(self.free_asteroids) == 0 :
+                for i in range(100) :
+                    self.createAsteroid('Asteroid {0}'.format(i))
+            else :
+                self.resetAsteroids()
+            #self.player.select_target(self.objects)
+            self.player.target = self.jumpgate2
+        
+    def stop(self, scores = False) :
+        if not self.menu :
+            self.menu = True
+            
+            if scores :
+                self.player.score += 111
+                
+            # save high score!
+            
+            self.highscores.append(self.player.score)
+            self.saveHighScores()
+            print('Game over, score: {0}'.format(self.player.score))
+            self.hud.updateHighScore(self)
+            
+            #self.client.window.remove(self.hud)
+            keeping = 0
+            while len(self.objects) > keeping :
+                if self.objects[keeping].keep :
+                    keeping += 1
+                else :
+                    self.remove(self.objects[keeping])
+            self.player.health = self.player.max_health
+            self.player.shield = self.player.max_shield
+            self.player.time = self.player.start_time
+            self.player.score = 0
+            goto = soy.atoms.Vector(self.scene.getPosition(self.jumpgate1.name))
+            #goto = goto - soy.atoms.Vector(self.scene.getPosition(self.player.name))
+            self.scene.setPosition(self.player.name, goto[0], goto[1], goto[2] - 100)
 
     def createAsteroid(self, name) :
         pos = []
@@ -492,6 +629,24 @@ class Game :
         self.objects.append(asteroid)
         self.scene.setKeep(name, False)
         self.scene.setDistance(name, self.scale * 2)
+        
+    def resetAsteroid(self, asteroid) :
+        pos = []
+        rot = []
+        for j in range(3) :
+            pos.append((random.random() * 3 - 1) * self.scale)
+            rot.append((random.random() * 2 - 1) * 10)
+        asteroid.body.addTorque(rot[0], rot[1], rot[2])
+        asteroid.body.position = soy.atoms.Position(pos)
+        self.objects.append(asteroid)
+        self.scene[asteroid.name] = asteroid.body
+        self.scene.setKeep(asteroid.name, False)
+        self.scene.setDistance(asteroid.name, self.scale * 2)
+    
+    def resetAsteroids(self) :
+        for obj in self.free_asteroids :
+            self.resetAsteroid(obj)
+        self.free_asteroids.clear()
         
     def createPowerUp(self, position) :
         name = 'Power Up {0}'.format(self.pup)
@@ -517,7 +672,7 @@ class Game :
         
     def remove(self, obj) :
         if obj.name.startswith('Asteroid') :
-            self.free_asteroids.append(obj.name)
+            self.free_asteroids.append(obj)
 
         del self.scene[obj.name]
         self.objects.remove(obj)
@@ -531,11 +686,15 @@ class Game :
 
         #__import__("code").interact(local=locals())
 
-        while self.client.window :
+        while self.client.window and not self.quit :
 
             current = time.time()
             dt = current - last
             last = current
+            
+            # skip lags
+            if dt > 0.5 :
+                dt = 0
             
             self.player.update(dt, game)
             
@@ -543,7 +702,7 @@ class Game :
                 hit = False
                 
                 for obj in self.objects :
-                    if obj.target and obj.collides(shot) :
+                    if obj.target and obj.collides(self.scene, shot) :
                         hit = True
                         if obj.shield > 0 :
                             obj.shield -= shot.damage
@@ -553,7 +712,7 @@ class Game :
                             obj.health -= shot.damage
                             if obj.health <= 0 :
                                 self.createPowerUp(obj.body.position)
-                                self.player.score += 1
+                                self.player.score += 10
                                 self.remove(obj)
                 
                 if current - shot.birth > 10 or hit :
@@ -561,11 +720,11 @@ class Game :
                     del self.scene['shot%d' % shot.number]
 
             for obj in self.objects :
-                if obj.collides(self.player) :
+                if obj.collides(self.scene, self.player) :
                     obj.collidePlayer(self)
         
             if self.player.health <= 0 or self.player.time <= 0 :
-                break
+                self.stop()
                 
             self.hud.update(self)
             
@@ -574,17 +733,15 @@ class Game :
                 for i, t in enumerate(self.objects) :
                     if t.name == name :
                         del self.objects[i]
-                if name.startswith('Asteroid') :
-                    self.free_asteroids.append(name)
+                        if name.startswith('Asteroid') :
+                            self.free_asteroids.append(t)
                 
             transitions = self.scene.pollCells()
-            if len(transitions) > 0 :
-                for name in self.free_asteroids :
-                    self.createAsteroid(name)
-                self.free_asteroids.clear()
+            if len(transitions) > 0 and not self.menu :
+                self.resetAsteroids()
 
             time.sleep(.01)
-        
+
 if __name__ == '__main__' :
     sdl2.SDL_InitSubSystem(sdl2.SDL_INIT_GAMECONTROLLER)
     sdl2.SDL_GameControllerEventState(sdl2.SDL_IGNORE)
